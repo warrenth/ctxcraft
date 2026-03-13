@@ -128,25 +128,25 @@ Merge granular rules files that cover related topics:
 ## Output Format
 
 ```
-┌─────────────────────────────────────────────┐
-│  ctxcraft — Optimization Plan               │
-│                                             │
-│  Current Score: 64/100                      │
-│  Estimated After: 85/100                    │
-│  Token Savings: ~2,100 tokens/conversation  │
-│                                             │
-│  📋 Changes                                 │
-│  1. Compress CLAUDE.md (320→148 lines)      │
-│     Saves: ~1,200 tokens                    │
-│  2. Merge 3 overlapping rules               │
-│     Saves: ~500 tokens                      │
-│  3. Move examples to skills                 │
-│     Saves: ~400 tokens                      │
-│  4. Remove 2 unused skills                  │
-│     Frees: ~800 tokens on-demand budget     │
-│                                             │
-│  Apply changes? [all / select / preview]    │
-└─────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────┐
+│  ctxcraft — 최적화 계획                             │
+│                                                    │
+│  현재 점수: 64/100                                 │
+│  예상 점수: 85/100                                 │
+│  절감 토큰: ~2,100 토큰/대화                        │
+│                                                    │
+│  📋 변경 사항                                       │
+│  1. CLAUDE.md 압축 (320→148줄)                     │
+│     절감: ~1,200 토큰                               │
+│  2. 중복 rules 3개 병합                             │
+│     절감: ~500 토큰                                 │
+│  3. 예제를 skills로 이동                            │
+│     절감: ~400 토큰                                 │
+│  4. 미사용 skills 2개 제거                          │
+│     확보: ~800 토큰 온디맨드 예산                    │
+│                                                    │
+│  변경 적용? [전체 / 선택 / 미리보기]                 │
+└───────────────────────────────────────────────────┘
 ```
 
 ## Important Rules

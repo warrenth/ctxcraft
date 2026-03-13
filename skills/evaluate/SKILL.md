@@ -82,31 +82,31 @@ Penalties:
 Output a clean, readable report:
 
 ```
-┌─────────────────────────────────────────────┐
-│  ctxcraft — Token Efficiency Report         │
-│                                             │
-│  Score: XX/100                              │
-│                                             │
-│  📊 Token Breakdown                         │
-│  Always-loaded:  ~X,XXX tokens (XX files)   │
-│  On-demand:      ~X,XXX tokens (XX files)   │
-│  Total context:  ~X,XXX tokens              │
-│  Estimated waste: ~X,XXX tokens             │
-│                                             │
-│  🔴 Critical (N issues)                     │
-│  • [specific issue + recommendation]        │
-│                                             │
-│  🟡 Warning (N issues)                      │
-│  • [specific issue + recommendation]        │
-│                                             │
-│  🟢 Info (N issues)                         │
-│  • [specific issue + recommendation]        │
-│                                             │
-│  💡 Quick Wins                              │
-│  • [top 3 easiest improvements]             │
-│                                             │
-│  Run /optimize to apply recommendations.    │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  ctxcraft — 토큰 효율 리포트                      │
+│                                                  │
+│  점수: XX/100                                    │
+│                                                  │
+│  📊 토큰 분석                                     │
+│  상시 로드:  ~X,XXX 토큰 (XX 파일)                │
+│  온디맨드:   ~X,XXX 토큰 (XX 파일)                │
+│  총 컨텍스트: ~X,XXX 토큰                         │
+│  추정 낭비:   ~X,XXX 토큰                         │
+│                                                  │
+│  🔴 심각 (N건)                                   │
+│  • [구체적 문제 + 개선 방안]                       │
+│                                                  │
+│  🟡 경고 (N건)                                   │
+│  • [구체적 문제 + 개선 방안]                       │
+│                                                  │
+│  🟢 참고 (N건)                                   │
+│  • [구체적 문제 + 개선 방안]                       │
+│                                                  │
+│  💡 빠른 개선                                     │
+│  • [가장 쉬운 개선 3가지]                          │
+│                                                  │
+│  /optimize 실행으로 개선을 적용하세요.              │
+└─────────────────────────────────────────────────┘
 ```
 
 ### Step 6: Save Report

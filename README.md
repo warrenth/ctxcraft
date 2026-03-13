@@ -1,34 +1,34 @@
 # ctxcraft
 
-> Evaluate and optimize your AI agent context. Save tokens, save money.
+> AI 에이전트 컨텍스트를 평가하고 최적화하세요. 토큰을 아끼고, 비용을 줄이세요.
 
-**ctxcraft** analyzes your `.claude/` directory structure and provides actionable recommendations to reduce token consumption without losing functionality.
+**ctxcraft**는 `.claude/` 디렉토리 구조를 분석하여 기능 손실 없이 토큰 소비를 줄이는 구체적인 개선안을 제시합니다.
 
-## Problem
+## 문제
 
-AI coding agents (Claude Code, Cursor, Windsurf) load context files every conversation. As your `.claude/` directory grows, you silently burn tokens on:
+AI 코딩 에이전트(Claude Code, Cursor, Windsurf)는 매 대화마다 컨텍스트 파일을 로드합니다. `.claude/` 디렉토리가 커질수록 다음과 같은 토큰 낭비가 조용히 발생합니다:
 
-- Overly verbose rules that could be half the size
-- Duplicate content across rules, skills, and CLAUDE.md
-- Unused skills and agents that never get triggered
-- Always-loaded files that should be on-demand
+- 절반으로 줄일 수 있는 장황한 규칙 파일
+- rules, skills, CLAUDE.md 간 중복 콘텐츠
+- 한 번도 호출되지 않는 미사용 skills/agents
+- 온디맨드로 전환 가능한 상시 로드 파일
 
-## Features
+## 기능
 
-| Command | Description |
-|---------|-------------|
-| `/evaluate` | Scan `.claude/` directory, estimate token usage, score efficiency (0-100) |
-| `/optimize` | Apply improvements based on evaluation results |
+| 명령어 | 설명 |
+|--------|------|
+| `/evaluate` | `.claude/` 디렉토리 스캔, 토큰 사용량 추정, 효율 점수(0-100) 산출 |
+| `/optimize` | 평가 결과 기반으로 개선 적용 |
 
-## Quick Start
+## 빠른 시작
 
-### Option 1: Install script (recommended)
+### 방법 1: 설치 스크립트 (권장)
 
 ```bash
 curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash
 ```
 
-### Option 2: Manual copy
+### 방법 2: 수동 복사
 
 ```bash
 git clone https://github.com/warrenth/ctxcraft.git
@@ -36,77 +36,77 @@ cp -r ctxcraft/skills/* /path/to/your/project/.claude/skills/
 cp -r ctxcraft/rules/* /path/to/your/project/.claude/rules/
 ```
 
-## What `/evaluate` Reports
+## `/evaluate` 리포트 예시
 
 ```
-┌─────────────────────────────────────────────┐
-│  ctxcraft — Token Efficiency Report         │
-│                                             │
-│  Score: 64/100                              │
-│                                             │
-│  📊 Token Breakdown                         │
-│  Always-loaded (rules, CLAUDE.md): ~4,200   │
-│  On-demand (skills, agents):       ~8,500   │
-│  Estimated waste:                  ~1,800   │
-│                                             │
-│  🔴 Critical                                │
-│  • CLAUDE.md is 320 lines — compress to 150 │
-│                                             │
-│  🟡 Warning                                 │
-│  • 3 rules files have overlapping content   │
-│  • 4 skills never referenced in 10 sessions │
-│                                             │
-│  🟢 Good                                    │
-│  • Agent delegation is well structured      │
-│  • Skills use progressive disclosure        │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  ctxcraft — 토큰 효율 리포트                      │
+│                                                  │
+│  점수: 64/100                                    │
+│                                                  │
+│  📊 토큰 분석                                     │
+│  상시 로드 (rules, CLAUDE.md):  ~4,200 토큰       │
+│  온디맨드 (skills, agents):     ~8,500 토큰       │
+│  추정 낭비:                     ~1,800 토큰       │
+│                                                  │
+│  🔴 심각                                         │
+│  • CLAUDE.md 320줄 → 150줄로 압축 가능            │
+│                                                  │
+│  🟡 경고                                         │
+│  • rules 파일 3개에서 내용 중복 감지               │
+│  • 최근 10세션 동안 미참조 skill 4개               │
+│                                                  │
+│  🟢 양호                                         │
+│  • 에이전트 위임 구조가 잘 설계됨                   │
+│  • Skills에 단계적 공개 패턴 적용됨                │
+└─────────────────────────────────────────────────┘
 ```
 
-## What `/optimize` Does
+## `/optimize`가 하는 일
 
-1. **Compress** — Reduce verbose rules and CLAUDE.md without losing meaning
-2. **Deduplicate** — Merge overlapping rules into single source of truth
-3. **Prune** — Identify and remove unused skills/agents
-4. **Restructure** — Move always-loaded content to on-demand skills
+1. **압축** — 의미를 유지하면서 장황한 rules와 CLAUDE.md 축소
+2. **중복 제거** — 겹치는 규칙을 단일 소스로 병합
+3. **정리** — 미사용 skills/agents 식별 및 제거
+4. **재구조화** — 상시 로드 콘텐츠를 온디맨드 skills로 이동
 
-All changes require your confirmation before applying.
+모든 변경은 적용 전 사용자 확인을 거칩니다.
 
-## Project Structure
+## 프로젝트 구조
 
 ```
 ctxcraft/
 ├── skills/
-│   ├── evaluate/SKILL.md     # /evaluate command
-│   ├── optimize/SKILL.md     # /optimize command
-│   └── token-guide/SKILL.md  # Token efficiency reference
+│   ├── evaluate/SKILL.md     # /evaluate 명령어
+│   ├── optimize/SKILL.md     # /optimize 명령어
+│   └── token-guide/SKILL.md  # 토큰 효율 레퍼런스
 ├── rules/
-│   └── token-efficiency.md   # Always-loaded efficiency rules
+│   └── token-efficiency.md   # 상시 로드 효율 규칙
 ├── agents/
-│   └── token-auditor.md      # Dedicated analysis agent
-└── install.sh                # One-line installer
+│   └── token-auditor.md      # 전용 분석 에이전트
+└── install.sh                # 원라인 설치 스크립트
 ```
 
-## Scoring Criteria
+## 점수 산정 기준
 
-| Category | Weight | What it measures |
-|----------|--------|------------------|
-| Always-loaded size | 30% | Total tokens in rules/ + CLAUDE.md |
-| Duplication | 25% | Content overlap across files |
-| Unused files | 20% | Skills/agents with no recent usage |
-| Progressive disclosure | 15% | Ratio of on-demand vs always-loaded |
-| Structure | 10% | Naming, organization, modularity |
+| 항목 | 가중치 | 측정 내용 |
+|------|--------|----------|
+| 상시 로드 크기 | 30% | rules/ + CLAUDE.md 총 토큰 수 |
+| 중복도 | 25% | 파일 간 콘텐츠 겹침 |
+| 미사용 파일 | 20% | 최근 사용 기록 없는 skills/agents |
+| 단계적 공개 | 15% | 온디맨드 vs 상시 로드 비율 |
+| 구조 | 10% | 네이밍, 구성, 모듈화 |
 
-## Supported Environments
+## 지원 환경
 
 - [x] Claude Code
-- [ ] Cursor (planned)
-- [ ] Windsurf (planned)
-- [ ] Cline (planned)
+- [ ] Cursor (예정)
+- [ ] Windsurf (예정)
+- [ ] Cline (예정)
 
-## Contributing
+## 기여
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+기여를 환영합니다! [CONTRIBUTING.md](CONTRIBUTING.md)를 참고하세요.
 
-## License
+## 라이선스
 
 MIT
