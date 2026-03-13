@@ -378,6 +378,167 @@ else
 fi
 print_check 8 "${CHECK_NAMES[7]}" "${CHECK_STATUS[7]}" "${CHECK_DETAIL[7]}"
 
+# [9] Agent YAML Frontmatter 유효성
+agent_bad=0
+agent_bad_list=""
+if [ -d "$CLAUDE_DIR/agents" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        # frontmatter: 첫 줄이 --- 이고 닫는 --- 존재해야 함
+        first_line=$(head -1 "$f" 2>/dev/null | tr -d '\r')
+        if [ "$first_line" = "---" ]; then
+            close_count=$(grep -c "^---$" "$f" 2>/dev/null || true)
+            if [ "$close_count" -lt 2 ]; then
+                agent_bad=$((agent_bad + 1))
+                agent_bad_list="${agent_bad_list} $(basename "$f")"
+            fi
+        else
+            agent_bad=$((agent_bad + 1))
+            agent_bad_list="${agent_bad_list} $(basename "$f")"
+        fi
+    done < <(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null)
+fi
+if [ "$agents_count" -eq 0 ]; then
+    add_result "Agent Frontmatter" "PASS" "agents 없음 (해당 없음)" 0
+elif [ "$agent_bad" -eq 0 ]; then
+    add_result "Agent Frontmatter" "PASS" "모든 agent 파일 YAML frontmatter 유효 (${agents_count}개)" 0
+else
+    add_result "Agent Frontmatter" "WARN" "frontmatter 누락/불완전 ${agent_bad}개:${agent_bad_list}" 0
+fi
+print_check 9 "${CHECK_NAMES[8]}" "${CHECK_STATUS[8]}" "${CHECK_DETAIL[8]}"
+
+# [10] Agent 필수 필드 검증 (name, description, tools)
+agent_missing_fields=0
+agent_missing_list=""
+if [ -d "$CLAUDE_DIR/agents" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        missing=""
+        grep -q "^name:" "$f" 2>/dev/null || missing="${missing}name "
+        grep -q "^description:" "$f" 2>/dev/null || missing="${missing}description "
+        grep -q "^tools:" "$f" 2>/dev/null || missing="${missing}tools "
+        if [ -n "$missing" ]; then
+            agent_missing_fields=$((agent_missing_fields + 1))
+            agent_missing_list="${agent_missing_list} $(basename "$f")[${missing% }]"
+        fi
+    done < <(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null)
+fi
+if [ "$agents_count" -eq 0 ]; then
+    add_result "Agent 필수 필드" "PASS" "agents 없음 (해당 없음)" 0
+elif [ "$agent_missing_fields" -eq 0 ]; then
+    add_result "Agent 필수 필드" "PASS" "모든 agent 파일 필수 필드(name/description/tools) 존재 (${agents_count}개)" 0
+else
+    add_result "Agent 필수 필드" "WARN" "필수 필드 누락 ${agent_missing_fields}개:${agent_missing_list}" 0
+fi
+print_check 10 "${CHECK_NAMES[9]}" "${CHECK_STATUS[9]}" "${CHECK_DETAIL[9]}"
+
+# [11] Skill Frontmatter 유효성
+skill_bad=0
+skill_bad_list=""
+if [ -d "$CLAUDE_DIR/skills" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        first_line=$(head -1 "$f" 2>/dev/null | tr -d '\r')
+        if [ "$first_line" = "---" ]; then
+            close_count=$(grep -c "^---$" "$f" 2>/dev/null || true)
+            if [ "$close_count" -lt 2 ]; then
+                skill_bad=$((skill_bad + 1))
+                skill_dir=$(echo "$f" | sed "s|$CLAUDE_DIR/skills/||" | sed 's|/SKILL.md||')
+                skill_bad_list="${skill_bad_list} ${skill_dir}"
+            fi
+        else
+            skill_bad=$((skill_bad + 1))
+            skill_dir=$(echo "$f" | sed "s|$CLAUDE_DIR/skills/||" | sed 's|/SKILL.md||')
+            skill_bad_list="${skill_bad_list} ${skill_dir}"
+        fi
+    done < <(find "$CLAUDE_DIR/skills" -name "SKILL.md" 2>/dev/null)
+fi
+if [ "$skills_count" -eq 0 ]; then
+    add_result "Skill Frontmatter" "PASS" "skills 없음 (해당 없음)" 0
+elif [ "$skill_bad" -eq 0 ]; then
+    add_result "Skill Frontmatter" "PASS" "모든 SKILL.md frontmatter 유효 (${skills_count}개)" 0
+else
+    add_result "Skill Frontmatter" "WARN" "frontmatter 누락/불완전 ${skill_bad}개:${skill_bad_list}" 0
+fi
+print_check 11 "${CHECK_NAMES[10]}" "${CHECK_STATUS[10]}" "${CHECK_DETAIL[10]}"
+
+# [12] Skill References 링크 유효성
+skill_ref_broken=0
+skill_ref_list=""
+if [ -d "$CLAUDE_DIR/skills" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        skill_dir=$(dirname "$f")
+        # references/ 링크 패턴 찾기
+        while IFS= read -r ref_path; do
+            # 상대 경로로 파일 존재 여부 확인
+            full_path="${skill_dir}/${ref_path}"
+            if [ ! -f "$full_path" ]; then
+                skill_ref_broken=$((skill_ref_broken + 1))
+                skill_name=$(echo "$f" | sed "s|$CLAUDE_DIR/skills/||" | sed 's|/SKILL.md||')
+                skill_ref_list="${skill_ref_list} ${skill_name}:${ref_path}"
+            fi
+        done < <(grep -oE 'references/[a-zA-Z0-9_./-]+\.md' "$f" 2>/dev/null || true)
+    done < <(find "$CLAUDE_DIR/skills" -name "SKILL.md" 2>/dev/null)
+fi
+if [ "$skills_count" -eq 0 ]; then
+    add_result "Skill References 링크" "PASS" "skills 없음 (해당 없음)" 0
+elif [ "$skill_ref_broken" -eq 0 ]; then
+    add_result "Skill References 링크" "PASS" "모든 references 링크 유효" 0
+else
+    add_result "Skill References 링크" "WARN" "존재하지 않는 references ${skill_ref_broken}개:${skill_ref_list}" 0
+fi
+print_check 12 "${CHECK_NAMES[11]}" "${CHECK_STATUS[11]}" "${CHECK_DETAIL[11]}"
+
+# [13] Rules 하단 스킬 참조 (> 패턴)
+rules_with_ref=0
+rules_without_ref=0
+rules_without_list=""
+if [ -d "$CLAUDE_DIR/rules" ] && [ "$rules_count" -gt 0 ]; then
+    for f in "$CLAUDE_DIR/rules/"*.md; do
+        [ -f "$f" ] || continue
+        # > 로 시작하는 참조 패턴 (심화, 참조, See, deep dive 등)
+        if grep -qE "^>\s*(심화|참조|See|deep dive|자세히|더 보기)" "$f" 2>/dev/null; then
+            rules_with_ref=$((rules_with_ref + 1))
+        else
+            rules_without_ref=$((rules_without_ref + 1))
+            rules_without_list="${rules_without_list} $(basename "$f")"
+        fi
+    done
+fi
+if [ "$rules_count" -eq 0 ]; then
+    add_result "Rules 스킬 참조" "PASS" "rules 없음 (해당 없음)" 0
+elif [ "$rules_without_ref" -eq 0 ]; then
+    add_result "Rules 스킬 참조" "PASS" "모든 rules 파일에 skills 참조 포함 (${rules_with_ref}개)" 0
+elif [ "$rules_without_ref" -le $((rules_count / 2)) ]; then
+    add_result "Rules 스킬 참조" "WARN" "skills 참조 없는 rules ${rules_without_ref}개:${rules_without_list}" 0
+else
+    add_result "Rules 스킬 참조" "WARN" "절반 이상의 rules에 skills 참조 없음 (${rules_without_ref}/${rules_count}개)" 0
+fi
+print_check 13 "${CHECK_NAMES[12]}" "${CHECK_STATUS[12]}" "${CHECK_DETAIL[12]}"
+
+# [14] Rules 순수 Markdown (YAML frontmatter 없음)
+rules_with_yaml=0
+rules_yaml_list=""
+if [ -d "$CLAUDE_DIR/rules" ]; then
+    for f in "$CLAUDE_DIR/rules/"*.md; do
+        [ -f "$f" ] || continue
+        first_line=$(head -1 "$f" 2>/dev/null | tr -d '\r')
+        if [ "$first_line" = "---" ]; then
+            rules_with_yaml=$((rules_with_yaml + 1))
+            rules_yaml_list="${rules_yaml_list} $(basename "$f")"
+        fi
+    done
+fi
+if [ "$rules_count" -eq 0 ]; then
+    add_result "Rules 순수 Markdown" "PASS" "rules 없음 (해당 없음)" 0
+elif [ "$rules_with_yaml" -eq 0 ]; then
+    add_result "Rules 순수 Markdown" "PASS" "모든 rules 파일 순수 Markdown (YAML frontmatter 없음)" 0
+else
+    add_result "Rules 순수 Markdown" "FAIL" "YAML frontmatter 있는 rules ${rules_with_yaml}개:${rules_yaml_list} — rules는 frontmatter 불필요" 0
+fi
+print_check 14 "${CHECK_NAMES[13]}" "${CHECK_STATUS[13]}" "${CHECK_DETAIL[13]}"
+
 # ─────────────────────────────────────────────
 # Phase 2: 리포트 요약
 # ─────────────────────────────────────────────
