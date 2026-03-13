@@ -140,14 +140,11 @@ print_check() {
     local num="$1"
     local name="$2"
     local status="$3"
-    local detail="$4"
-    printf "${BOLD}[%2d] %s${RESET}\n" "$num" "$name"
     case "$status" in
-        PASS) echo -e "     ${GREEN}PASS${RESET} $detail" ;;
-        WARN) echo -e "     ${YELLOW}WARN${RESET} $detail" ;;
-        FAIL) echo -e "     ${RED}FAIL${RESET} $detail" ;;
+        PASS) printf "  ${GREEN}PASS${RESET}  [%2d] %s\n" "$num" "$name" ;;
+        WARN) printf "  ${YELLOW}WARN${RESET}  [%2d] %s\n" "$num" "$name" ;;
+        FAIL) printf "  ${RED}FAIL${RESET}  [%2d] %s\n" "$num" "$name" ;;
     esac
-    echo ""
 }
 
 count_lines() {

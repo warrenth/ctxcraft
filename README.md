@@ -32,47 +32,22 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 
   ✓ 스캔 완료 (파일 60개)
 
-[ 1] CLAUDE.md 크기
-     PASS 174줄 (기준: 500줄 이하)
-
-[ 2] 상시 로드 토큰
-     FAIL ~16848 토큰 — 기준 15000 크게 초과
-
-[ 3] Rules 파일 크기
-     FAIL 기준(130줄) 초과 1개: coroutines.md(140줄)
-
-[ 4] Rules 파일 수
-     PASS 13개 (기준: 15개 이하)
-
-[ 5] 중복 섹션
-     WARN 중복 제목 1개 감지
-
-[ 6] 단계적 공개
-     PASS 온디맨드 76% / 상시 24%
-
-[ 7] Skills 파일 크기
-     WARN 기준(250줄) 초과 2개
-
-[ 8] 토큰 배분 비율
-     PASS 상시 24% / 온디맨드 76% — 이상적
-
-[ 9] Agent Frontmatter
-     PASS 모든 agent 파일 YAML frontmatter 유효 (14개)
-
-[10] Agent 필수 필드
-     PASS 모든 agent 파일 필수 필드(name/description/tools) 존재
-
-[11] Skill Frontmatter
-     PASS 모든 SKILL.md frontmatter 유효 (32개)
-
-[12] Skill References 링크
-     PASS 모든 references 링크 유효
-
-[13] Rules 스킬 참조
-     WARN skills 참조 없는 rules 1개: ai-behavior.md
-
-[14] Rules 순수 Markdown
-     PASS 모든 rules 파일 순수 Markdown (YAML frontmatter 없음)
+  PASS  [ 1] CLAUDE.md 크기
+  FAIL  [ 2] 상시 로드 토큰
+  FAIL  [ 3] Rules 파일 크기
+  PASS  [ 4] Rules 파일 수
+  WARN  [ 5] 중복 섹션
+  PASS  [ 6] 단계적 공개
+  WARN  [ 7] Skills 파일 크기
+  PASS  [ 8] 토큰 배분 비율
+  PASS  [ 9] Agent Frontmatter
+  PASS  [10] Agent 필수 필드
+  PASS  [11] Skill Frontmatter
+  PASS  [12] Skill References 링크
+  WARN  [13] Rules 스킬 참조
+  PASS  [14] Rules 순수 Markdown
+  PASS  [15] Skills 고아 디렉토리
+  PASS  [16] Rules 평면 구조
 
 ━━━ Phase 2: 리포트 ━━━
 
@@ -87,26 +62,15 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
   └────────────────────┴──────────────┴───────────┘
 
   📋 검증 결과
-  PASS  [1] CLAUDE.md 크기
-  FAIL  [2] 상시 로드 토큰
-  FAIL  [3] Rules 파일 크기
-  PASS  [4] Rules 파일 수
-  WARN  [5] 중복 섹션
-  PASS  [6] 단계적 공개
-  WARN  [7] Skills 파일 크기
-  PASS  [8] 토큰 배분 비율
-  PASS  [9] Agent Frontmatter
-  PASS  [10] Agent 필수 필드
-  PASS  [11] Skill Frontmatter
-  PASS  [12] Skill References 링크
-  WARN  [13] Rules 스킬 참조
-  PASS  [14] Rules 순수 Markdown
+  PASS  [ 1] CLAUDE.md 크기
+  FAIL  [ 2] 상시 로드 토큰
+  ...
 
   💡 절감 가능: ~9168 토큰/대화
 
 ━━━ 최종 요약 ━━━
-  점수: 75/100 (B) — 양호합니다
-  PASS 9개  WARN 3개  FAIL 2개
+  점수: 78/100 (B) — 양호합니다
+  PASS 11개  WARN 3개  FAIL 2개
 
 ━━━ Phase 3: 최적화 ━━━
 
@@ -114,10 +78,25 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 
   ✓ 설치 완료
   ✓ Claude Code 감지 — 최적화를 시작합니다.
+```
 
-  # Claude Code가 자동으로 /optimize 실행
-  # → 변경 사항 확인 후 적용
-  # → 완료 시 ctxcraft 파일 자동 삭제
+## 최적화 결과 (Before/After)
+
+최적화 완료 후 자동으로 비교 리포트를 출력합니다:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  ctxcraft — 최적화 완료                               │
+│                                                      │
+│           Before      After      절감                │
+│  점수      78/100  →  92/100   (+14점)               │
+│  상시토큰  16,848  →   9,200   (-7,648 토큰/대화)    │
+│  등급      B       →  A                              │
+│                                                      │
+│  PASS 11개 → 15개   WARN 3개 → 1개   FAIL 2개 → 0개 │
+└─────────────────────────────────────────────────────┘
+
+✅ 최적화 완료! ctxcraft 파일을 모두 정리했습니다.
 ```
 
 ## 검증 항목
@@ -135,7 +114,7 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 | 7 | Skills 파일 크기 | 250줄 이하 | 개별 스킬 적정 크기 |
 | 8 | 토큰 배분 비율 | 상시 30% 이하 | 전체 대비 상시 로드 비중 |
 
-### 구조 유효성 (9~14)
+### 구조 유효성 (9~16)
 
 | # | 항목 | 기준 | 측정 내용 |
 |---|------|------|----------|
@@ -163,7 +142,8 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 2. **중복 제거** — 겹치는 규칙을 단일 소스로 병합
 3. **정리** — 미사용 skills/agents 식별 및 제거
 4. **재구조화** — 상시 로드 콘텐츠를 온디맨드 skills로 이동
-5. **자동 삭제** — 최적화 완료 후 ctxcraft 파일 자동 정리
+5. **references 분리** — SKILL.md 250줄 초과 시 상세 내용을 references/로 이동
+6. **자동 삭제** — 최적화 완료 후 ctxcraft 파일 자동 정리
 
 모든 변경은 적용 전 사용자 확인을 거칩니다.
 
@@ -172,50 +152,15 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 ```
 ctxcraft/
 ├── evaluate.sh                 # 원라인 평가 스크립트 (핵심)
+├── action.yml                  # GitHub Actions 통합
 ├── skills/
 │   ├── evaluate/SKILL.md       # /evaluate 명령어
 │   ├── optimize/SKILL.md       # /optimize 명령어
 │   └── token-guide/SKILL.md    # 토큰 효율 레퍼런스
 ├── agents/
 │   └── token-auditor.md        # 전용 분석 에이전트
-└── install.sh                  # 설치 스크립트 (레거시)
-```
-
-## GitHub Actions
-
-`.claude/` 파일이 변경된 PR마다 자동으로 평가하고 코멘트를 남깁니다.
-
-`.github/workflows/ctxcraft-check.yml` 생성:
-
-```yaml
-name: ctxcraft Token Efficiency Check
-
-on:
-  pull_request:
-    paths:
-      - '.claude/**'
-      - 'CLAUDE.md'
-
-jobs:
-  evaluate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: ctxcraft 평가
-        uses: warrenth/ctxcraft@main
-        with:
-          threshold: '70'          # 이 점수 미만이면 PR 체크 실패
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-```
-
-PR에 자동으로 이런 코멘트가 달립니다:
-
-```
-🟡 ctxcraft 토큰 효율 리포트
-
-75/100 (B) — 양호합니다
-✅ 기준 70점 통과
+└── examples/
+    └── ctxcraft-check.yml      # GitHub Actions 워크플로우 예시
 ```
 
 ## 지원 환경
