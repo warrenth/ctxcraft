@@ -56,6 +56,24 @@ $ curl -sL .../evaluate.sh | bash
 [ 8] 토큰 배분 비율
      PASS 상시 24% / 온디맨드 76% — 이상적
 
+[ 9] Agent Frontmatter
+     PASS 모든 agent 파일 YAML frontmatter 유효 (14개)
+
+[10] Agent 필수 필드
+     PASS 모든 agent 파일 필수 필드(name/description/tools) 존재
+
+[11] Skill Frontmatter
+     PASS 모든 SKILL.md frontmatter 유효 (32개)
+
+[12] Skill References 링크
+     PASS 모든 references 링크 유효
+
+[13] Rules 스킬 참조
+     WARN skills 참조 없는 rules 1개: ai-behavior.md
+
+[14] Rules 순수 Markdown
+     PASS 모든 rules 파일 순수 Markdown (YAML frontmatter 없음)
+
 ━━━ Phase 2: 리포트 ━━━
 
   📊 토큰 분석
@@ -77,12 +95,18 @@ $ curl -sL .../evaluate.sh | bash
   PASS  [6] 단계적 공개
   WARN  [7] Skills 파일 크기
   PASS  [8] 토큰 배분 비율
+  PASS  [9] Agent Frontmatter
+  PASS  [10] Agent 필수 필드
+  PASS  [11] Skill Frontmatter
+  PASS  [12] Skill References 링크
+  WARN  [13] Rules 스킬 참조
+  PASS  [14] Rules 순수 Markdown
 
   💡 절감 가능: ~9168 토큰/대화
 
 ━━━ 최종 요약 ━━━
-  점수: 62/100 (C) — 개선이 필요합니다
-  PASS 4개  WARN 2개  FAIL 2개
+  점수: 75/100 (B) — 양호합니다
+  PASS 9개  WARN 3개  FAIL 2개
 
 ━━━ Phase 3: 최적화 ━━━
 
@@ -99,6 +123,8 @@ $ curl -sL .../evaluate.sh | bash
 
 ## 검증 항목
 
+### 토큰 효율 (1~8)
+
 | # | 항목 | 기준 | 측정 내용 |
 |---|------|------|----------|
 | 1 | CLAUDE.md 크기 | 500줄 이하 | 매 대화 로드되는 핵심 파일 |
@@ -109,6 +135,17 @@ $ curl -sL .../evaluate.sh | bash
 | 6 | 단계적 공개 | 온디맨드 50%+ | 상시 vs 온디맨드 비율 |
 | 7 | Skills 파일 크기 | 250줄 이하 | 개별 스킬 적정 크기 |
 | 8 | 토큰 배분 비율 | 상시 30% 이하 | 전체 대비 상시 로드 비중 |
+
+### 구조 유효성 (9~14)
+
+| # | 항목 | 기준 | 측정 내용 |
+|---|------|------|----------|
+| 9 | Agent Frontmatter | YAML `---` 블록 완전 | agent 파일 frontmatter 유효성 |
+| 10 | Agent 필수 필드 | name/description/tools | agent 필수 메타데이터 존재 여부 |
+| 11 | Skill Frontmatter | YAML `---` 블록 완전 | SKILL.md frontmatter 유효성 |
+| 12 | Skill References 링크 | 파일 실제 존재 | references/*.md 링크 유효성 |
+| 13 | Rules 스킬 참조 | `>` 참조 패턴 포함 | rules 하단 심화 skills 참조 여부 |
+| 14 | Rules 순수 Markdown | YAML frontmatter 없음 | rules는 frontmatter 불필요 |
 
 ## 점수 등급
 
