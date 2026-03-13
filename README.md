@@ -61,10 +61,12 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
   │ 합계               │      69888   │    60     │
   └────────────────────┴──────────────┴───────────┘
 
-  📋 검증 결과
-  PASS  [ 1] CLAUDE.md 크기
-  FAIL  [ 2] 상시 로드 토큰
-  ...
+  📋 개선 필요 항목
+  FAIL  [ 2] 상시 로드 토큰        → rules 전체 압축 필요, 절감 가능: ~8848 토큰
+  FAIL  [ 3] Rules 파일 크기       → coroutines.md — 예시/설명 제거 또는 skills로 이동
+  WARN  [ 5] 중복 섹션             → 한 곳만 남기고 나머지 섹션 제거
+  WARN  [ 7] Skills 파일 크기      → compose-navigation — 상세 내용을 references/ 하위 폴더로 분리
+  WARN  [13] Rules 스킬 참조       → ai-behavior.md — 하단에 '> 심화: /skill-name' 한 줄 추가
 
   💡 절감 가능: ~9168 토큰/대화
 
