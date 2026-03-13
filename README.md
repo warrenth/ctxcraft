@@ -179,6 +179,43 @@ ctxcraft/
 └── install.sh                  # 설치 스크립트 (레거시)
 ```
 
+## GitHub Actions
+
+`.claude/` 파일이 변경된 PR마다 자동으로 평가하고 코멘트를 남깁니다.
+
+`.github/workflows/ctxcraft-check.yml` 생성:
+
+```yaml
+name: ctxcraft Token Efficiency Check
+
+on:
+  pull_request:
+    paths:
+      - '.claude/**'
+      - 'CLAUDE.md'
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ctxcraft 평가
+        uses: warrenth/ctxcraft@main
+        with:
+          threshold: '70'          # 이 점수 미만이면 PR 체크 실패
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+PR에 자동으로 이런 코멘트가 달립니다:
+
+```
+🟡 ctxcraft 토큰 효율 리포트
+
+75/100 (B) — 양호합니다
+✅ 기준 70점 통과
+```
+
 ## 지원 환경
 
 - [x] Claude Code

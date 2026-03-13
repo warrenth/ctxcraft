@@ -1,0 +1,97 @@
+name: 'ctxcraft Token Efficiency'
+description: '.claude/ 디렉토리 토큰 효율을 평가하고 PR에 리포트를 남깁니다'
+
+inputs:
+  threshold:
+    description: '통과 기준 점수 (기본값: 70)'
+    required: false
+    default: '70'
+  github-token:
+    description: 'PR 코멘트 작성용 GitHub 토큰'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  score:
+    description: '토큰 효율 점수 (0-100)'
+    value: ${{ steps.evaluate.outputs.score }}
+  grade:
+    description: '등급 (A/B/C/D)'
+    value: ${{ steps.evaluate.outputs.grade }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: ctxcraft 평가 실행
+      id: evaluate
+      shell: bash
+      run: |
+        curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh -o /tmp/ctxcraft.sh
+
+        # --ci 모드로 실행 (스피너/Phase3 없음), ANSI 코드 제거
+        bash /tmp/ctxcraft.sh --ci --threshold=${{ inputs.threshold }} 2>/dev/null \
+          | sed 's/\x1b\[[0-9;]*m//g' | sed 's/\r//g' \
+          > /tmp/ctxcraft-output.txt || EXIT_CODE=$?
+
+        # 점수/등급 추출
+        SCORE=$(grep -oE '[0-9]+/100' /tmp/ctxcraft-output.txt | tail -1 | cut -d'/' -f1 || echo "0")
+        GRADE=$(grep -oE '\([A-D]\)' /tmp/ctxcraft-output.txt | tail -1 | tr -d '()' || echo "D")
+
+        echo "score=$SCORE" >> $GITHUB_OUTPUT
+        echo "grade=$GRADE" >> $GITHUB_OUTPUT
+        echo "exit_code=${EXIT_CODE:-0}" >> $GITHUB_OUTPUT
+
+        cat /tmp/ctxcraft-output.txt
+
+    - name: PR 코멘트 작성
+      if: github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        SCORE="${{ steps.evaluate.outputs.score }}"
+        GRADE="${{ steps.evaluate.outputs.grade }}"
+        EXIT_CODE="${{ steps.evaluate.outputs.exit_code }}"
+
+        case "$GRADE" in
+          A) BADGE="🟢" ; STATUS="훌륭합니다!" ;;
+          B) BADGE="🟡" ; STATUS="양호합니다" ;;
+          C) BADGE="🟠" ; STATUS="개선이 필요합니다" ;;
+          D) BADGE="🔴" ; STATUS="즉시 최적화를 권장합니다" ;;
+          *) BADGE="⚪" ; STATUS="" ;;
+        esac
+
+        THRESHOLD="${{ inputs.threshold }}"
+        if [ "$EXIT_CODE" != "0" ]; then
+          RESULT="❌ 기준 ${THRESHOLD}점 미달 — 최적화가 필요합니다"
+        else
+          RESULT="✅ 기준 ${THRESHOLD}점 통과"
+        fi
+
+        COMMENT="## ${BADGE} ctxcraft 토큰 효율 리포트
+
+**${SCORE}/100 (${GRADE})** — ${STATUS}
+
+${RESULT}
+
+<details>
+<summary>상세 결과 보기</summary>
+
+\`\`\`
+$(cat /tmp/ctxcraft-output.txt)
+\`\`\`
+
+</details>
+
+> 최적화하려면: \`bash /tmp/ctxcraft.sh\` 실행 후 \`y\` 선택"
+
+        gh pr comment ${{ github.event.pull_request.number }} \
+          --repo ${{ github.repository }} \
+          --body "$COMMENT" 2>/dev/null || true
+
+    - name: 기준 점수 미달 시 실패
+      if: steps.evaluate.outputs.exit_code != '0'
+      shell: bash
+      run: |
+        echo "ctxcraft 점수(${{ steps.evaluate.outputs.score }}/100)가 기준(${{ inputs.threshold }})에 미달합니다"
+        exit 1

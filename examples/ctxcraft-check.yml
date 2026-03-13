@@ -1,0 +1,19 @@
+name: ctxcraft Token Efficiency Check
+
+on:
+  pull_request:
+    paths:
+      - '.claude/**'
+      - 'CLAUDE.md'
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ctxcraft 평가
+        uses: warrenth/ctxcraft@main
+        with:
+          threshold: '70'          # 이 점수 미만이면 PR 체크 실패
+          github-token: ${{ secrets.GITHUB_TOKEN }}

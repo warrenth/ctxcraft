@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
 # ctxcraft — AI 에이전트 컨텍스트 토큰 효율 평가
 # Usage: curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | bash
+# CI:    bash /tmp/ctxcraft.sh --ci [--threshold=70]
 
 set -euo pipefail
+
+# ─────────────────────────────────────────────
+# 인수 파싱
+# ─────────────────────────────────────────────
+CI_MODE=false
+CI_THRESHOLD=70
+for arg in "$@"; do
+    case "$arg" in
+        --ci)             CI_MODE=true ;;
+        --threshold=*)    CI_THRESHOLD="${arg#*=}" ;;
+    esac
+done
 
 # ─────────────────────────────────────────────
 # CONFIG
@@ -54,6 +67,10 @@ trap cleanup_on_exit EXIT INT TERM
 
 start_spinner() {
     local msg="${1:-처리 중...}"
+    if [[ "$CI_MODE" == "true" ]]; then
+        echo "  → ${msg}"
+        return
+    fi
     (
         local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
         local i=0
@@ -69,6 +86,10 @@ start_spinner() {
 
 stop_spinner() {
     local result="${1:-완료}"
+    if [[ "$CI_MODE" == "true" ]]; then
+        echo "  ✓ ${result}"
+        return
+    fi
     if [[ -n "$SPINNER_PID" ]] && kill -0 "$SPINNER_PID" 2>/dev/null; then
         kill "$SPINNER_PID" 2>/dev/null
         wait "$SPINNER_PID" 2>/dev/null || true
@@ -633,6 +654,20 @@ echo ""
 # Phase 3: 최적화 제안
 # ─────────────────────────────────────────────
 if [ "$score_100" -lt 85 ]; then
+    # CI 모드: Phase 3 건너뛰고 종료 코드로 결과 반환
+    if [[ "$CI_MODE" == "true" ]]; then
+        echo ""
+        if [ "$score_100" -lt "$CI_THRESHOLD" ]; then
+            echo "::error::ctxcraft 점수 ${score_100}/100 — 기준 ${CI_THRESHOLD}점 미달"
+            NORMAL_EXIT=true
+            exit 1
+        else
+            echo "::notice::ctxcraft 점수 ${score_100}/100 (${grade}) — 기준 통과"
+            NORMAL_EXIT=true
+            exit 0
+        fi
+    fi
+
     echo -e "${CYAN}${BOLD}━━━ Phase 3: 최적화 ━━━${RESET}\n"
     echo -e "  평가 결과를 바탕으로 자동 최적화를 실행합니다."
     echo -e "  ${DIM}(압축, 중복 제거, 재구조화 — 완료 후 자동 삭제)${RESET}"
