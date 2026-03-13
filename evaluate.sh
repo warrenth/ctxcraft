@@ -172,6 +172,7 @@ if [ "$no_agent_system" = true ]; then
     echo ""
     echo -e "  ${YELLOW}아직 에이전트 시스템을 사용하고 계시지 않군요.${RESET}"
     echo -e "  ${DIM}.claude/rules, .claude/skills 가 없으면 낭비할 토큰도 없습니다.${RESET}"
+    echo -e "  ${DIM}토큰이 걱정될 때 다시 실행하세요.${RESET}"
     echo ""
     NORMAL_EXIT=true
     exit 0
