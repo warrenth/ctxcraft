@@ -643,6 +643,24 @@ if [ "$saveable_tokens" -gt 0 ]; then
 fi
 
 # ─────────────────────────────────────────────
+# Before 상태 저장 (optimize 후 비교용)
+# ─────────────────────────────────────────────
+mkdir -p "$CLAUDE_DIR/scratch"
+cat > "$CLAUDE_DIR/scratch/ctxcraft-before.json" << EOF
+{
+  "score": ${score_100},
+  "grade": "${grade}",
+  "always_tokens": ${always_tokens},
+  "ondemand_tokens": ${ondemand_tokens},
+  "total_tokens": ${total_tokens},
+  "pass": ${pass_count},
+  "warn": ${warn_count},
+  "fail": ${fail_count},
+  "saveable_tokens": ${saveable_tokens}
+}
+EOF
+
+# ─────────────────────────────────────────────
 # 최종 요약
 # ─────────────────────────────────────────────
 echo -e "${CYAN}${BOLD}━━━ 최종 요약 ━━━${RESET}"

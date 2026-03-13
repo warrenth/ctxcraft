@@ -117,12 +117,14 @@ Merge granular rules files that cover related topics:
 ## Execution Flow
 
 ```
-1. Read evaluation report (or run /evaluate)
+1. Read .claude/scratch/ctxcraft-before.json for before state
 2. Present optimization plan with estimated savings
 3. Ask user: "Apply all? Select specific? Preview only?"
 4. For --dry flag: show diffs without applying
 5. Apply changes with user confirmation per strategy
-6. Re-run evaluation to show before/after score
+6. Re-run /evaluate to get after state
+7. Show before/after comparison report
+8. Clean up ctxcraft files
 ```
 
 ## Output Format
@@ -148,6 +150,25 @@ Merge granular rules files that cover related topics:
 │  변경 적용? [전체 / 선택 / 미리보기]                 │
 └───────────────────────────────────────────────────┘
 ```
+
+## Before/After 비교 리포트
+
+모든 변경 적용 후 반드시 `/evaluate`를 재실행하고 아래 형식으로 비교를 출력한다:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  ctxcraft — 최적화 완료                               │
+│                                                      │
+│           Before      After      절감                │
+│  점수      75/100  →  91/100   (+16점)               │
+│  상시토큰  16,848  →   9,200   (-7,648 토큰/대화)    │
+│  등급      B       →  A                              │
+│                                                      │
+│  PASS 9개 → 13개   WARN 3개 → 1개   FAIL 2개 → 0개  │
+└─────────────────────────────────────────────────────┘
+```
+
+Before 데이터는 `.claude/scratch/ctxcraft-before.json`에서 읽는다.
 
 ## Cleanup After Optimization
 
