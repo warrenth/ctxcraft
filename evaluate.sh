@@ -601,6 +601,127 @@ else
 fi
 print_check 16 "${CHECK_NAMES[15]}" "${CHECK_STATUS[15]}" "${CHECK_DETAIL[15]}"
 
+# [17] Agent Skills 참조 유효성 (agent frontmatter skills: 필드 → skills/ 실제 존재)
+agent_skill_broken=0
+agent_skill_list=""
+if [ -d "$CLAUDE_DIR/agents" ] && [ -d "$CLAUDE_DIR/skills" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        agent_base=$(basename "$f")
+        # frontmatter 내 skills: 리스트 파싱 (- item 형식)
+        in_fm=false
+        in_skills=false
+        while IFS= read -r line; do
+            line=$(echo "$line" | tr -d '\r')
+            if [ "$line" = "---" ]; then
+                if [ "$in_fm" = false ]; then in_fm=true; continue
+                else break; fi
+            fi
+            [ "$in_fm" = false ] && continue
+            if echo "$line" | grep -q "^skills:"; then
+                in_skills=true; continue
+            fi
+            if [ "$in_skills" = true ]; then
+                if echo "$line" | grep -qE "^  - "; then
+                    skill_ref=$(echo "$line" | sed 's/^  - //' | tr -d ' ')
+                    if [ ! -d "$CLAUDE_DIR/skills/$skill_ref" ]; then
+                        agent_skill_broken=$((agent_skill_broken + 1))
+                        agent_skill_list="${agent_skill_list} ${agent_base}:${skill_ref}"
+                    fi
+                elif echo "$line" | grep -qE "^[a-zA-Z]"; then
+                    in_skills=false
+                fi
+            fi
+        done < "$f"
+    done < <(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null)
+fi
+if [ "$agents_count" -eq 0 ]; then
+    add_result "Agent Skills 참조" "PASS" "agents 없음 (해당 없음)" 0
+elif [ "$agent_skill_broken" -eq 0 ]; then
+    add_result "Agent Skills 참조" "PASS" "모든 agent skills 참조 유효" 0
+else
+    add_result "Agent Skills 참조" "WARN" "존재하지 않는 skill 참조 ${agent_skill_broken}개:${agent_skill_list}" 0 "skills/ 디렉토리 생성 또는 agent frontmatter skills 필드 수정"
+fi
+print_check 17 "${CHECK_NAMES[16]}" "${CHECK_STATUS[16]}" "${CHECK_DETAIL[16]}"
+
+# [18] Agent Tools 최소권한 (분석 전용 에이전트에 Write/Edit 없어야)
+readonly_patterns="reviewer auditor architect planner"
+agent_perm_bad=0
+agent_perm_list=""
+if [ -d "$CLAUDE_DIR/agents" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        agent_base=$(basename "$f" .md)
+        # 이름에 읽기 전용 패턴이 있는지
+        is_readonly=false
+        for pat in $readonly_patterns; do
+            echo "$agent_base" | grep -qi "$pat" && is_readonly=true && break
+        done
+        [ "$is_readonly" = false ] && continue
+        # tools 필드에 Write 또는 Edit 있는지 (frontmatter 내)
+        tools_line=$(grep "^tools:" "$f" 2>/dev/null | head -1 || true)
+        if echo "$tools_line" | grep -qE "\bWrite\b|\bEdit\b"; then
+            agent_perm_bad=$((agent_perm_bad + 1))
+            agent_perm_list="${agent_perm_list} $(basename "$f")"
+        fi
+    done < <(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null)
+fi
+if [ "$agents_count" -eq 0 ]; then
+    add_result "Agent Tools 최소권한" "PASS" "agents 없음 (해당 없음)" 0
+elif [ "$agent_perm_bad" -eq 0 ]; then
+    add_result "Agent Tools 최소권한" "PASS" "분석 전용 에이전트 모두 최소 권한 준수" 0
+else
+    add_result "Agent Tools 최소권한" "WARN" "reviewer/auditor/architect/planner에 Write/Edit 권한 ${agent_perm_bad}개:${agent_perm_list}" 0 "${agent_perm_list% }— tools에서 Write/Edit 제거 (Read,Grep,Glob만 유지)"
+fi
+print_check 18 "${CHECK_NAMES[17]}" "${CHECK_STATUS[17]}" "${CHECK_DETAIL[17]}"
+
+# [19] Rules MUST/SHOULD/NEVER 구조 (RFC 2119 강제성 키워드)
+rules_no_keywords=0
+rules_no_kw_list=""
+if [ -d "$CLAUDE_DIR/rules" ] && [ "$rules_count" -gt 0 ]; then
+    for f in "$CLAUDE_DIR/rules/"*.md; do
+        [ -f "$f" ] || continue
+        missing_kw=""
+        grep -q "MUST\|반드시" "$f" 2>/dev/null || missing_kw="${missing_kw}MUST "
+        grep -q "SHOULD\|권장" "$f" 2>/dev/null || missing_kw="${missing_kw}SHOULD "
+        grep -q "NEVER\|절대\|금지" "$f" 2>/dev/null || missing_kw="${missing_kw}NEVER "
+        if [ -n "$missing_kw" ]; then
+            rules_no_keywords=$((rules_no_keywords + 1))
+            rules_no_kw_list="${rules_no_kw_list} $(basename "$f")[${missing_kw% }]"
+        fi
+    done
+fi
+if [ "$rules_count" -eq 0 ]; then
+    add_result "Rules 강제성 키워드" "PASS" "rules 없음 (해당 없음)" 0
+elif [ "$rules_no_keywords" -eq 0 ]; then
+    add_result "Rules 강제성 키워드" "PASS" "모든 rules 파일에 MUST/SHOULD/NEVER 구조 존재" 0
+else
+    add_result "Rules 강제성 키워드" "WARN" "강제성 키워드 부족 ${rules_no_keywords}개:${rules_no_kw_list}" 0 "규칙을 '반드시 ~한다 / 권장한다 / 절대 ~금지' 형식으로 작성"
+fi
+print_check 19 "${CHECK_NAMES[18]}" "${CHECK_STATUS[18]}" "${CHECK_DETAIL[18]}"
+
+# [20] CLAUDE.md ↔ skills/ 동기화 (CLAUDE.md에 언급된 스킬명이 실제 존재하는지)
+claude_skill_missing=0
+claude_skill_list=""
+if [ -f "$ROOT_CLAUDE" ] && [ -d "$CLAUDE_DIR/skills" ]; then
+    # CLAUDE.md에서 backtick으로 감싼 소문자-하이픈 패턴 추출
+    while IFS= read -r skill_ref; do
+        [ -z "$skill_ref" ] && continue
+        if [ ! -d "$CLAUDE_DIR/skills/$skill_ref" ]; then
+            claude_skill_missing=$((claude_skill_missing + 1))
+            claude_skill_list="${claude_skill_list} ${skill_ref}"
+        fi
+    done < <(grep -oE '\`[a-z][a-z0-9-]+\`' "$ROOT_CLAUDE" 2>/dev/null | tr -d '`' | sort -u || true)
+fi
+if [ ! -f "$ROOT_CLAUDE" ] || [ ! -d "$CLAUDE_DIR/skills" ]; then
+    add_result "CLAUDE.md ↔ Skills 동기화" "PASS" "CLAUDE.md 또는 skills/ 없음 (해당 없음)" 0
+elif [ "$claude_skill_missing" -eq 0 ]; then
+    add_result "CLAUDE.md ↔ Skills 동기화" "PASS" "CLAUDE.md에 언급된 모든 skill이 skills/에 존재" 0
+else
+    add_result "CLAUDE.md ↔ Skills 동기화" "WARN" "CLAUDE.md에 언급됐지만 skills/ 없는 항목 ${claude_skill_missing}개:${claude_skill_list}" 0 "skills/ 디렉토리 생성 또는 CLAUDE.md에서 언급 제거"
+fi
+print_check 20 "${CHECK_NAMES[19]}" "${CHECK_STATUS[19]}" "${CHECK_DETAIL[19]}"
+
 # ─────────────────────────────────────────────
 # Phase 2: 리포트 요약
 # ─────────────────────────────────────────────

@@ -116,7 +116,7 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 | 7 | Skills 파일 크기 | 250줄 이하 | 개별 스킬 적정 크기 |
 | 8 | 토큰 배분 비율 | 상시 30% 이하 | 전체 대비 상시 로드 비중 |
 
-### 구조 유효성 (9~16)
+### 구조 유효성 (9~20)
 
 | # | 항목 | 기준 | 측정 내용 |
 |---|------|------|----------|
@@ -128,6 +128,10 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 | 14 | Rules 순수 Markdown | YAML frontmatter 없음 | rules는 frontmatter 불필요 |
 | 15 | Skills 고아 디렉토리 | SKILL.md 반드시 존재 | skills/xxx/ 있는데 SKILL.md 없으면 미작동 |
 | 16 | Rules 평면 구조 | 하위 디렉토리 없음 | rules/는 flat .md 파일만 허용 |
+| 17 | Agent Skills 참조 | skills/ 디렉토리 실존 | agent frontmatter skills 필드의 실존 여부 |
+| 18 | Agent Tools 최소권한 | reviewer/auditor/architect/planner에 Write/Edit 금지 | 분석 전용 에이전트 최소 권한 원칙 |
+| 19 | Rules 강제성 키워드 | MUST/SHOULD/NEVER 구조 | RFC 2119 스타일 규칙 작성 여부 |
+| 20 | CLAUDE.md ↔ Skills 동기화 | 언급된 skill 실존 | CLAUDE.md backtick 스킬명과 skills/ 디렉토리 일치 여부 |
 
 ## 점수 등급
 
