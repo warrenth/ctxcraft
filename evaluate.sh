@@ -152,15 +152,11 @@ no_agent_system=false
 
 if [ ! -d "$CLAUDE_DIR" ]; then
     no_agent_system=true
-elif [ ! -d "$CLAUDE_DIR/rules" ] && [ ! -d "$CLAUDE_DIR/skills" ]; then
-    no_agent_system=true
-elif [ ! -d "$CLAUDE_DIR/rules" ] && [ ! -d "$CLAUDE_DIR/skills" ]; then
-    no_agent_system=true
 else
-    # rules, skills 디렉토리가 있어도 파일이 없으면
     rules_md_count=$(find "$CLAUDE_DIR/rules" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
     skills_md_count=$(find "$CLAUDE_DIR/skills" -name "SKILL.md" 2>/dev/null | wc -l | tr -d ' ')
-    if [ "$rules_md_count" -eq 0 ] && [ "$skills_md_count" -eq 0 ]; then
+    agents_md_count=$(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$rules_md_count" -eq 0 ] && [ "$skills_md_count" -eq 0 ] && [ "$agents_md_count" -eq 0 ]; then
         no_agent_system=true
     fi
 fi
