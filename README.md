@@ -110,15 +110,14 @@ $ curl -sL .../evaluate.sh | bash
 
 ━━━ Phase 3: 최적화 ━━━
 
-  개선하시겠습니까? (y/n): y
+  지금 최적화하시겠습니까? (y/n): y
 
-  ✓ ctxcraft 최적화 도구 설치 완료
+  ✓ 설치 완료
+  ✓ Claude Code 감지 — 최적화를 시작합니다.
 
-  Claude Code에서 실행하세요:
-    /optimize        — 자동 최적화
-    /optimize --dry  — 미리보기만
-
-  최적화 완료 후 ctxcraft 파일은 자동으로 삭제됩니다.
+  # Claude Code가 자동으로 /optimize 실행
+  # → 변경 사항 확인 후 적용
+  # → 완료 시 ctxcraft 파일 자동 삭제
 ```
 
 ## 검증 항목

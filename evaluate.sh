@@ -634,15 +634,15 @@ echo ""
 # ─────────────────────────────────────────────
 if [ "$score_100" -lt 85 ]; then
     echo -e "${CYAN}${BOLD}━━━ Phase 3: 최적화 ━━━${RESET}\n"
-    echo -e "  ctxcraft 최적화 도구를 설치하면 Claude Code에서"
-    echo -e "  ${BOLD}/optimize${RESET} 명령으로 자동 최적화를 수행할 수 있습니다."
+    echo -e "  평가 결과를 바탕으로 자동 최적화를 실행합니다."
     echo -e "  ${DIM}(압축, 중복 제거, 재구조화 — 완료 후 자동 삭제)${RESET}"
     echo ""
-    printf "  설치하시겠습니까? (y/n): "
+    printf "  지금 최적화하시겠습니까? (y/n): "
     read -r REPLY
     echo ""
 
     if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+        # 1. 스킬 설치
         start_spinner "ctxcraft 최적화 도구 설치 중..."
         TEMP_DIR=$(mktemp -d)
         git clone --quiet --depth 1 "$REPO_URL" "$TEMP_DIR/ctxcraft"
@@ -662,14 +662,24 @@ if [ "$score_100" -lt 85 ]; then
 
         rm -rf "$TEMP_DIR"
         stop_spinner "설치 완료"
+        echo ""
 
-        echo ""
-        echo -e "  ${BOLD}Claude Code에서 실행하세요:${RESET}"
-        echo ""
-        echo -e "    ${BOLD}/optimize${RESET}        — 자동 최적화"
-        echo -e "    ${BOLD}/optimize --dry${RESET}  — 미리보기만"
-        echo ""
-        echo -e "  ${DIM}최적화 완료 후 ctxcraft 파일은 자동으로 삭제됩니다.${RESET}"
+        # 2. claude CLI로 /optimize 자동 실행
+        if command -v claude &>/dev/null; then
+            echo -e "  ${GREEN}✓${RESET} Claude Code 감지 — 최적화를 시작합니다."
+            echo -e "  ${DIM}완료 후 ctxcraft 파일은 자동으로 삭제됩니다.${RESET}"
+            echo ""
+            NORMAL_EXIT=true
+            claude "/optimize"
+        else
+            echo -e "  ${YELLOW}⚠${RESET}  claude CLI를 찾을 수 없습니다."
+            echo -e "  Claude Code에서 직접 실행하세요:"
+            echo ""
+            echo -e "    ${BOLD}/optimize${RESET}        — 자동 최적화"
+            echo -e "    ${BOLD}/optimize --dry${RESET}  — 미리보기만"
+            echo ""
+            echo -e "  ${DIM}최적화 완료 후 ctxcraft 파일은 자동으로 삭제됩니다.${RESET}"
+        fi
     else
         echo -e "  ${DIM}건너뛰었습니다.${RESET}"
         echo -e "  나중에 다시: ${DIM}curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | bash${RESET}"
