@@ -173,9 +173,6 @@ if [ "$no_agent_system" = true ]; then
     echo -e "  ${YELLOW}아직 에이전트 시스템을 사용하고 계시지 않군요.${RESET}"
     echo -e "  ${DIM}.claude/rules, .claude/skills 가 없으면 낭비할 토큰도 없습니다.${RESET}"
     echo ""
-    echo -e "  Claude Code 에이전트 시스템을 시작하고 싶다면:"
-    echo -e "  ${DIM}https://github.com/warrenth/ctxcraft${RESET}"
-    echo ""
     NORMAL_EXIT=true
     exit 0
 fi
