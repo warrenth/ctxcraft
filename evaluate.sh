@@ -1,26 +1,133 @@
-#!/bin/bash
-# ctxcraft — AI 에이전트 컨텍스트 토큰 효율 평가 및 최적화
+#!/usr/bin/env bash
+# ctxcraft — AI 에이전트 컨텍스트 토큰 효율 평가
 # Usage: curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | bash
 
-set -e
+set -euo pipefail
 
-# ─── 설정 ───
+# ─────────────────────────────────────────────
+# CONFIG
+# ─────────────────────────────────────────────
 CLAUDE_DIR=".claude"
 ROOT_CLAUDE="CLAUDE.md"
 REPO_URL="https://github.com/warrenth/ctxcraft.git"
-TOKENS_PER_LINE=12  # 보수적 추정: 줄당 평균 12 토큰
+TOKENS_PER_LINE=12
 
-# ─── 색상 ───
+CLAUDE_MD_MAX=200
+RULES_MAX=80
+SKILLS_MAX=150
+AGENTS_MAX=120
+ALWAYS_LOADED_WARN=4000
+ALWAYS_LOADED_CRITICAL=6000
+RULES_COUNT_MAX=10
+DUP_HEADING_THRESHOLD=1
+
+# ─────────────────────────────────────────────
+# ANSI
+# ─────────────────────────────────────────────
 RED='\033[0;31m'
-YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[1;36m'
 BLUE='\033[0;34m'
-CYAN='\033[0;36m'
 BOLD='\033[1m'
 DIM='\033[2m'
-NC='\033[0m' # No Color
+RESET='\033[0m'
 
-# ─── 유틸리티 ───
+# ─────────────────────────────────────────────
+# 스피너
+# ─────────────────────────────────────────────
+SPINNER_PID=""
+NORMAL_EXIT=false
+
+cleanup_on_exit() {
+    if [[ -n "${SPINNER_PID:-}" ]] && kill -0 "$SPINNER_PID" 2>/dev/null; then
+        kill "$SPINNER_PID" 2>/dev/null
+        wait "$SPINNER_PID" 2>/dev/null || true
+        printf "\r\033[2K"
+    fi
+    if [[ "$NORMAL_EXIT" != "true" ]]; then
+        echo -e "\n${YELLOW}중단됨.${RESET}"
+    fi
+}
+trap cleanup_on_exit EXIT INT TERM
+
+start_spinner() {
+    local msg="${1:-처리 중...}"
+    (
+        local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+        local i=0
+        while true; do
+            printf "\r  ${CYAN}${frames[$i]}${RESET} ${msg}  "
+            i=$(( (i + 1) % ${#frames[@]} ))
+            sleep 0.12
+        done
+    ) &
+    SPINNER_PID=$!
+    disown "$SPINNER_PID" 2>/dev/null
+}
+
+stop_spinner() {
+    local result="${1:-완료}"
+    if [[ -n "$SPINNER_PID" ]] && kill -0 "$SPINNER_PID" 2>/dev/null; then
+        kill "$SPINNER_PID" 2>/dev/null
+        wait "$SPINNER_PID" 2>/dev/null || true
+    fi
+    SPINNER_PID=""
+    printf "\r\033[2K"
+    echo -e "  ${GREEN}✓${RESET} ${result}"
+}
+
+# ─────────────────────────────────────────────
+# 결과 저장
+# ─────────────────────────────────────────────
+declare -a CHECK_NAMES
+declare -a CHECK_STATUS    # PASS / WARN / FAIL
+declare -a CHECK_DETAIL
+declare -a CHECK_TOKENS    # 해당 항목의 토큰 절감 가능량
+
+CHECK_IDX=0
+
+add_result() {
+    local name="$1"
+    local status="$2"
+    local detail="$3"
+    local tokens="${4:-0}"
+    CHECK_NAMES[$CHECK_IDX]="$name"
+    CHECK_STATUS[$CHECK_IDX]="$status"
+    CHECK_DETAIL[$CHECK_IDX]="$detail"
+    CHECK_TOKENS[$CHECK_IDX]="$tokens"
+    CHECK_IDX=$((CHECK_IDX + 1))
+}
+
+# ─────────────────────────────────────────────
+# 점수 계산
+# ─────────────────────────────────────────────
+score_for_status() {
+    case "$1" in
+        PASS) echo 10 ;;
+        WARN) echo 5 ;;
+        FAIL) echo 0 ;;
+        *)    echo 0 ;;
+    esac
+}
+
+# ─────────────────────────────────────────────
+# 출력 헬퍼
+# ─────────────────────────────────────────────
+print_check() {
+    local num="$1"
+    local name="$2"
+    local status="$3"
+    local detail="$4"
+    printf "${BOLD}[%2d] %s${RESET}\n" "$num" "$name"
+    case "$status" in
+        PASS) echo -e "     ${GREEN}PASS${RESET} $detail" ;;
+        WARN) echo -e "     ${YELLOW}WARN${RESET} $detail" ;;
+        FAIL) echo -e "     ${RED}FAIL${RESET} $detail" ;;
+    esac
+    echo ""
+}
+
 count_lines() {
     if [ -f "$1" ]; then
         wc -l < "$1" | tr -d ' '
@@ -29,213 +136,268 @@ count_lines() {
     fi
 }
 
-count_tokens() {
-    local lines=$1
-    echo $(( lines * TOKENS_PER_LINE ))
-}
-
-# ─── 시작 ───
+# ─────────────────────────────────────────────
+# 시작
+# ─────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}  ctxcraft — 토큰 효율 평가${NC}"
-echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "${CYAN}${BOLD}  ctxcraft — 토큰 효율 평가${RESET}"
+echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "  디렉토리: ${BOLD}$(pwd)/${CLAUDE_DIR}${RESET}"
 echo ""
 
-# ─── .claude 디렉토리 확인 ───
+# .claude 확인
 if [ ! -d "$CLAUDE_DIR" ]; then
-    echo -e "${RED}❌ .claude/ 디렉토리를 찾을 수 없습니다.${NC}"
+    echo -e "${RED}❌ .claude/ 디렉토리를 찾을 수 없습니다.${RESET}"
     echo "   프로젝트 루트 디렉토리에서 실행해주세요."
+    NORMAL_EXIT=true
     exit 1
 fi
 
-# ─── 1. 파일 스캔 ───
-echo -e "${CYAN}📂 파일 스캔 중...${NC}"
-echo ""
+# ─────────────────────────────────────────────
+# Phase 1: 검증
+# ─────────────────────────────────────────────
+echo -e "${CYAN}${BOLD}━━━ Phase 1: 토큰 효율 검증 ━━━${RESET}\n"
 
-# 상시 로드 파일 (CLAUDE.md + rules/)
-always_loaded_lines=0
-always_loaded_files=0
-always_loaded_detail=""
+start_spinner "파일 스캔 중..."
+sleep 0.5
 
-# 루트 CLAUDE.md
+# 기본 수집
+always_lines=0
+always_files=0
+ondemand_lines=0
+ondemand_files=0
+rules_count=0
+skills_count=0
+agents_count=0
+
+# CLAUDE.md 줄 수
+claude_md_lines=0
 if [ -f "$ROOT_CLAUDE" ]; then
-    lines=$(count_lines "$ROOT_CLAUDE")
-    always_loaded_lines=$((always_loaded_lines + lines))
-    always_loaded_files=$((always_loaded_files + 1))
-    always_loaded_detail="${always_loaded_detail}   ${ROOT_CLAUDE}: ${lines}줄\n"
+    claude_md_lines=$(count_lines "$ROOT_CLAUDE")
+    always_lines=$((always_lines + claude_md_lines))
+    always_files=$((always_files + 1))
 fi
-
-# .claude/CLAUDE.md
 if [ -f "$CLAUDE_DIR/CLAUDE.md" ]; then
     lines=$(count_lines "$CLAUDE_DIR/CLAUDE.md")
-    always_loaded_lines=$((always_loaded_lines + lines))
-    always_loaded_files=$((always_loaded_files + 1))
-    always_loaded_detail="${always_loaded_detail}   .claude/CLAUDE.md: ${lines}줄\n"
+    always_lines=$((always_lines + lines))
+    always_files=$((always_files + 1))
+    claude_md_lines=$((claude_md_lines + lines))
 fi
 
-# rules/*.md
-rules_count=0
+# rules 수집
+declare -a OVERSIZED_RULES
 rules_lines=0
-rules_detail=""
-oversized_rules=""
 if [ -d "$CLAUDE_DIR/rules" ]; then
     for f in "$CLAUDE_DIR/rules/"*.md; do
         [ -f "$f" ] || continue
         lines=$(count_lines "$f")
-        name=$(basename "$f")
         rules_count=$((rules_count + 1))
         rules_lines=$((rules_lines + lines))
-        rules_detail="${rules_detail}   rules/${name}: ${lines}줄\n"
-        if [ "$lines" -gt 80 ]; then
-            oversized_rules="${oversized_rules}   rules/${name}: ${lines}줄 (기준: 80줄)\n"
+        always_lines=$((always_lines + lines))
+        always_files=$((always_files + 1))
+        if [ "$lines" -gt "$RULES_MAX" ]; then
+            OVERSIZED_RULES+=("$(basename "$f"):${lines}")
         fi
     done
 fi
-always_loaded_lines=$((always_loaded_lines + rules_lines))
-always_loaded_files=$((always_loaded_files + rules_count))
 
-# 온디맨드 파일 (skills/, agents/)
-ondemand_lines=0
-ondemand_files=0
-skills_count=0
-agents_count=0
-oversized_skills=""
-
+# skills 수집
+declare -a OVERSIZED_SKILLS
 if [ -d "$CLAUDE_DIR/skills" ]; then
-    for f in $(find "$CLAUDE_DIR/skills" -name "SKILL.md" 2>/dev/null); do
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
         lines=$(count_lines "$f")
         skills_count=$((skills_count + 1))
         ondemand_lines=$((ondemand_lines + lines))
         ondemand_files=$((ondemand_files + 1))
-        if [ "$lines" -gt 150 ]; then
+        if [ "$lines" -gt "$SKILLS_MAX" ]; then
             skill_name=$(echo "$f" | sed "s|$CLAUDE_DIR/skills/||" | sed 's|/SKILL.md||')
-            oversized_skills="${oversized_skills}   skills/${skill_name}: ${lines}줄 (기준: 150줄)\n"
+            OVERSIZED_SKILLS+=("${skill_name}:${lines}")
         fi
-    done
+    done < <(find "$CLAUDE_DIR/skills" -name "SKILL.md" 2>/dev/null)
 fi
 
+# agents 수집
 if [ -d "$CLAUDE_DIR/agents" ]; then
     for f in "$CLAUDE_DIR/agents/"*.md; do
         [ -f "$f" ] || continue
         lines=$(count_lines "$f")
-        name=$(basename "$f")
         agents_count=$((agents_count + 1))
         ondemand_lines=$((ondemand_lines + lines))
         ondemand_files=$((ondemand_files + 1))
     done
+    # 하위 디렉토리
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        lines=$(count_lines "$f")
+        agents_count=$((agents_count + 1))
+        ondemand_lines=$((ondemand_lines + lines))
+        ondemand_files=$((ondemand_files + 1))
+    done < <(find "$CLAUDE_DIR/agents" -mindepth 2 -name "*.md" 2>/dev/null)
 fi
 
-# 토큰 계산
-always_tokens=$(count_tokens $always_loaded_lines)
-ondemand_tokens=$(count_tokens $ondemand_lines)
+always_tokens=$((always_lines * TOKENS_PER_LINE))
+ondemand_tokens=$((ondemand_lines * TOKENS_PER_LINE))
 total_tokens=$((always_tokens + ondemand_tokens))
 
-# ─── 2. 문제 감지 ───
-score=100
-critical=""
-critical_count=0
-warning=""
-warning_count=0
-info=""
-info_count=0
-quickwins=""
+stop_spinner "스캔 완료 (파일 $((always_files + ondemand_files))개)"
+echo ""
 
-# 🔴 심각: CLAUDE.md 200줄 초과
-if [ -f "$ROOT_CLAUDE" ]; then
-    claude_lines=$(count_lines "$ROOT_CLAUDE")
-    if [ "$claude_lines" -gt 200 ]; then
-        penalty=$(( (claude_lines - 200) / 10 ))
-        [ "$penalty" -gt 20 ] && penalty=20
-        score=$((score - penalty))
-        critical="${critical}   CLAUDE.md ${claude_lines}줄 → 200줄 이하로 압축 필요 (절감: ~$(count_tokens $((claude_lines - 150))) 토큰)\n"
-        critical_count=$((critical_count + 1))
-        quickwins="${quickwins}   CLAUDE.md를 인덱스 형태로 압축 (절감: ~$(count_tokens $((claude_lines - 150))) 토큰)\n"
-    fi
+# ─── 검증 항목 ───
+
+# [1] CLAUDE.md 크기
+if [ "$claude_md_lines" -eq 0 ]; then
+    add_result "CLAUDE.md 크기" "WARN" "CLAUDE.md 파일 없음" 0
+elif [ "$claude_md_lines" -le "$CLAUDE_MD_MAX" ]; then
+    add_result "CLAUDE.md 크기" "PASS" "${claude_md_lines}줄 (기준: ${CLAUDE_MD_MAX}줄 이하)" 0
+else
+    save=$((claude_md_lines - 150))
+    add_result "CLAUDE.md 크기" "FAIL" "${claude_md_lines}줄 → ${CLAUDE_MD_MAX}줄 이하로 압축 필요" $((save * TOKENS_PER_LINE))
 fi
+print_check 1 "${CHECK_NAMES[0]}" "${CHECK_STATUS[0]}" "${CHECK_DETAIL[0]}"
 
-# 🔴 심각: 상시 로드 5,000 토큰 초과
-if [ "$always_tokens" -gt 5000 ]; then
-    excess=$(( (always_tokens - 3000) / 100 ))
-    [ "$excess" -gt 30 ] && excess=30
-    score=$((score - excess))
-    critical="${critical}   상시 로드 총 ~${always_tokens} 토큰 (권장: 4,000 이하)\n"
-    critical_count=$((critical_count + 1))
+# [2] 상시 로드 총량
+if [ "$always_tokens" -le "$ALWAYS_LOADED_WARN" ]; then
+    add_result "상시 로드 토큰" "PASS" "~${always_tokens} 토큰 (${always_files}개 파일) — 기준: ${ALWAYS_LOADED_WARN} 이하" 0
+elif [ "$always_tokens" -le "$ALWAYS_LOADED_CRITICAL" ]; then
+    add_result "상시 로드 토큰" "WARN" "~${always_tokens} 토큰 — 기준 ${ALWAYS_LOADED_WARN} 초과" $((always_tokens - ALWAYS_LOADED_WARN))
+else
+    add_result "상시 로드 토큰" "FAIL" "~${always_tokens} 토큰 — 기준 ${ALWAYS_LOADED_CRITICAL} 크게 초과" $((always_tokens - ALWAYS_LOADED_WARN))
 fi
+print_check 2 "${CHECK_NAMES[1]}" "${CHECK_STATUS[1]}" "${CHECK_DETAIL[1]}"
 
-# 🔴 심각: rules 파일 80줄 초과
-if [ -n "$oversized_rules" ]; then
-    oversized_count=$(echo -e "$oversized_rules" | grep -c "줄" 2>/dev/null || echo "0")
-    penalty=$((oversized_count * 3))
-    [ "$penalty" -gt 15 ] && penalty=15
-    score=$((score - penalty))
-    critical="${critical}${oversized_rules}"
-    critical_count=$((critical_count + oversized_count))
-    quickwins="${quickwins}   과대 rules 파일에서 예제/상세 설명을 skills로 이동\n"
+# [3] Rules 파일 크기
+if [ "$rules_count" -eq 0 ]; then
+    add_result "Rules 파일 크기" "WARN" "rules/ 디렉토리 없음" 0
+elif [ ${#OVERSIZED_RULES[@]} -eq 0 ]; then
+    add_result "Rules 파일 크기" "PASS" "모든 rules 파일 ${RULES_MAX}줄 이하 (${rules_count}개)" 0
+else
+    detail="기준(${RULES_MAX}줄) 초과 ${#OVERSIZED_RULES[@]}개:"
+    save_tokens=0
+    for entry in "${OVERSIZED_RULES[@]}"; do
+        name="${entry%%:*}"
+        lines="${entry##*:}"
+        detail="${detail} ${name}(${lines}줄)"
+        excess=$((lines - RULES_MAX))
+        save_tokens=$((save_tokens + excess * TOKENS_PER_LINE))
+    done
+    add_result "Rules 파일 크기" "FAIL" "$detail" "$save_tokens"
 fi
+print_check 3 "${CHECK_NAMES[2]}" "${CHECK_STATUS[2]}" "${CHECK_DETAIL[2]}"
 
-# 🟡 경고: rules 10개 초과
-if [ "$rules_count" -gt 10 ]; then
-    score=$((score - 10))
-    warning="${warning}   rules/ 파일 ${rules_count}개 → 5~8개로 통합 권장\n"
-    warning_count=$((warning_count + 1))
-    quickwins="${quickwins}   관련 rules 파일 병합 (${rules_count}개 → 5~8개)\n"
+# [4] Rules 파일 수
+if [ "$rules_count" -le "$RULES_COUNT_MAX" ]; then
+    add_result "Rules 파일 수" "PASS" "${rules_count}개 (기준: ${RULES_COUNT_MAX}개 이하)" 0
+else
+    add_result "Rules 파일 수" "WARN" "${rules_count}개 → 5~8개로 통합 권장" 0
 fi
+print_check 4 "${CHECK_NAMES[3]}" "${CHECK_STATUS[3]}" "${CHECK_DETAIL[3]}"
 
-# 🟡 경고: skills 과대
-if [ -n "$oversized_skills" ]; then
-    oversized_s_count=$(echo -e "$oversized_skills" | grep -c "줄" 2>/dev/null || echo "0")
-    score=$((score - oversized_s_count * 2))
-    warning="${warning}${oversized_skills}"
-    warning_count=$((warning_count + oversized_s_count))
-fi
-
-# 🟡 경고: 단계적 공개 비율 체크
-if [ "$ondemand_files" -eq 0 ] && [ "$always_loaded_files" -gt 3 ]; then
-    score=$((score - 15))
-    warning="${warning}   단계적 공개 미적용: 모든 콘텐츠가 상시 로드됨\n"
-    warning_count=$((warning_count + 1))
-    quickwins="${quickwins}   상세 설명을 skills/로 이동하여 단계적 공개 적용\n"
-fi
-
-# 🟡 경고: 중복 감지 (같은 제목이 여러 파일에 존재)
-if [ -d "$CLAUDE_DIR/rules" ]; then
-    dup_headings=$(grep -rh "^## " "$CLAUDE_DIR/rules/" "$ROOT_CLAUDE" 2>/dev/null | sort | uniq -d | head -5)
+# [5] 중복 섹션 감지
+dup_count=0
+dup_headings=""
+if [ -d "$CLAUDE_DIR/rules" ] && [ -f "$ROOT_CLAUDE" ]; then
+    dup_headings=$(grep -rh "^## " "$CLAUDE_DIR/rules/" "$ROOT_CLAUDE" 2>/dev/null | sort | uniq -d | head -5 || true)
     if [ -n "$dup_headings" ]; then
         dup_count=$(echo "$dup_headings" | wc -l | tr -d ' ')
-        penalty=$((dup_count * 5))
-        [ "$penalty" -gt 25 ] && penalty=25
-        score=$((score - penalty))
-        warning="${warning}   중복 섹션 ${dup_count}개 감지 (CLAUDE.md ↔ rules/ 간 동일 제목)\n"
-        while IFS= read -r heading; do
-            warning="${warning}     - ${heading}\n"
-        done <<< "$dup_headings"
-        warning_count=$((warning_count + 1))
     fi
 fi
-
-# 🟢 참고
-if [ "$skills_count" -gt 0 ]; then
-    info="${info}   skills ${skills_count}개 구성됨 (온디맨드 로드)\n"
-    info_count=$((info_count + 1))
+if [ "$dup_count" -eq 0 ]; then
+    add_result "중복 섹션" "PASS" "CLAUDE.md ↔ rules/ 간 중복 섹션 없음" 0
+elif [ "$dup_count" -le 2 ]; then
+    add_result "중복 섹션" "WARN" "중복 제목 ${dup_count}개 감지: $(echo "$dup_headings" | tr '\n' ', ')" $((dup_count * 200))
+else
+    add_result "중복 섹션" "FAIL" "중복 제목 ${dup_count}개 감지: $(echo "$dup_headings" | tr '\n' ', ')" $((dup_count * 200))
 fi
-if [ "$agents_count" -gt 0 ]; then
-    info="${info}   agents ${agents_count}개 구성됨 (온디맨드 로드)\n"
-    info_count=$((info_count + 1))
+print_check 5 "${CHECK_NAMES[4]}" "${CHECK_STATUS[4]}" "${CHECK_DETAIL[4]}"
+
+# [6] 단계적 공개 (Progressive Disclosure)
+if [ "$ondemand_files" -gt 0 ] && [ "$always_files" -gt 0 ]; then
+    ratio=$((ondemand_files * 100 / (always_files + ondemand_files)))
+    if [ "$ratio" -ge 50 ]; then
+        add_result "단계적 공개" "PASS" "온디맨드 ${ratio}% (${ondemand_files}개) / 상시 $((100 - ratio))% (${always_files}개)" 0
+    else
+        add_result "단계적 공개" "WARN" "온디맨드 ${ratio}% — 상시 로드 비중이 높음" 0
+    fi
+elif [ "$ondemand_files" -eq 0 ] && [ "$always_files" -gt 3 ]; then
+    add_result "단계적 공개" "FAIL" "skills/agents 없음 — 모든 콘텐츠가 상시 로드" 0
+else
+    add_result "단계적 공개" "PASS" "구조 적절" 0
+fi
+print_check 6 "${CHECK_NAMES[5]}" "${CHECK_STATUS[5]}" "${CHECK_DETAIL[5]}"
+
+# [7] Skills 파일 크기
+if [ "$skills_count" -eq 0 ]; then
+    add_result "Skills 파일 크기" "PASS" "skills 없음 (해당 없음)" 0
+elif [ ${#OVERSIZED_SKILLS[@]} -eq 0 ]; then
+    add_result "Skills 파일 크기" "PASS" "모든 SKILL.md ${SKILLS_MAX}줄 이하 (${skills_count}개)" 0
+else
+    detail="기준(${SKILLS_MAX}줄) 초과 ${#OVERSIZED_SKILLS[@]}개:"
+    for entry in "${OVERSIZED_SKILLS[@]}"; do
+        name="${entry%%:*}"
+        lines="${entry##*:}"
+        detail="${detail} ${name}(${lines}줄)"
+    done
+    add_result "Skills 파일 크기" "WARN" "$detail" 0
+fi
+print_check 7 "${CHECK_NAMES[6]}" "${CHECK_STATUS[6]}" "${CHECK_DETAIL[6]}"
+
+# [8] 상시 vs 온디맨드 비율
+if [ "$total_tokens" -gt 0 ]; then
+    always_pct=$((always_tokens * 100 / total_tokens))
+    if [ "$always_pct" -le 30 ]; then
+        add_result "토큰 배분 비율" "PASS" "상시 ${always_pct}% / 온디맨드 $((100 - always_pct))% — 이상적" 0
+    elif [ "$always_pct" -le 50 ]; then
+        add_result "토큰 배분 비율" "WARN" "상시 ${always_pct}% / 온디맨드 $((100 - always_pct))% — 상시 비중 높음" 0
+    else
+        add_result "토큰 배분 비율" "FAIL" "상시 ${always_pct}% / 온디맨드 $((100 - always_pct))% — 상시 비중 과다" 0
+    fi
+else
+    add_result "토큰 배분 비율" "WARN" "분석할 파일 없음" 0
+fi
+print_check 8 "${CHECK_NAMES[7]}" "${CHECK_STATUS[7]}" "${CHECK_DETAIL[7]}"
+
+# ─────────────────────────────────────────────
+# Phase 2: 리포트 요약
+# ─────────────────────────────────────────────
+echo -e "${CYAN}${BOLD}━━━ Phase 2: 리포트 ━━━${RESET}\n"
+
+# 점수 계산
+total_score=0
+max_score=$((CHECK_IDX * 10))
+pass_count=0
+warn_count=0
+fail_count=0
+saveable_tokens=0
+
+for i in $(seq 0 $((CHECK_IDX - 1))); do
+    total_score=$((total_score + $(score_for_status "${CHECK_STATUS[$i]}")))
+    saveable_tokens=$((saveable_tokens + CHECK_TOKENS[$i]))
+    case "${CHECK_STATUS[$i]}" in
+        PASS) pass_count=$((pass_count + 1)) ;;
+        WARN) warn_count=$((warn_count + 1)) ;;
+        FAIL) fail_count=$((fail_count + 1)) ;;
+    esac
+done
+
+# 100점 환산
+if [ "$max_score" -gt 0 ]; then
+    score_100=$((total_score * 100 / max_score))
+else
+    score_100=0
 fi
 
-# 점수 하한
-[ "$score" -lt 0 ] && score=0
-
-# ─── 3. 등급 ───
-if [ "$score" -ge 85 ]; then
+# 등급
+if [ "$score_100" -ge 85 ]; then
     grade="A"
     grade_color="$GREEN"
     grade_msg="훌륭합니다!"
-elif [ "$score" -ge 70 ]; then
+elif [ "$score_100" -ge 70 ]; then
     grade="B"
     grade_color="$GREEN"
     grade_msg="양호합니다"
-elif [ "$score" -ge 50 ]; then
+elif [ "$score_100" -ge 50 ]; then
     grade="C"
     grade_color="$YELLOW"
     grade_msg="개선이 필요합니다"
@@ -245,100 +407,95 @@ else
     grade_msg="즉시 최적화를 권장합니다"
 fi
 
-# ─── 4. 리포트 출력 ───
-echo -e "${BOLD}┌─────────────────────────────────────────────────┐${NC}"
-echo -e "${BOLD}│  ctxcraft — 토큰 효율 리포트                    │${NC}"
-echo -e "${BOLD}├─────────────────────────────────────────────────┤${NC}"
-echo ""
-echo -e "  ${BOLD}점수: ${grade_color}${score}/100 (${grade}) — ${grade_msg}${NC}"
-echo ""
-echo -e "  ${BOLD}📊 토큰 분석${NC}"
-echo -e "  상시 로드:  ${RED}~${always_tokens} 토큰${NC} (${always_loaded_files}개 파일, ${always_loaded_lines}줄)"
-echo -e "  온디맨드:   ${GREEN}~${ondemand_tokens} 토큰${NC} (${ondemand_files}개 파일, ${ondemand_lines}줄)"
-echo -e "  총 컨텍스트: ~${total_tokens} 토큰"
-echo ""
-echo -e "  ${DIM}상시 로드 상세:${NC}"
-echo -e "$always_loaded_detail"
-if [ -n "$rules_detail" ]; then
-    echo -e "$rules_detail"
-fi
-
-if [ "$critical_count" -gt 0 ]; then
-    echo -e "  ${RED}🔴 심각 (${critical_count}건)${NC}"
-    echo -e "$critical"
-fi
-
-if [ "$warning_count" -gt 0 ]; then
-    echo -e "  ${YELLOW}🟡 경고 (${warning_count}건)${NC}"
-    echo -e "$warning"
-fi
-
-if [ "$info_count" -gt 0 ]; then
-    echo -e "  ${GREEN}🟢 참고 (${info_count}건)${NC}"
-    echo -e "$info"
-fi
-
-if [ -n "$quickwins" ]; then
-    echo -e "  ${BLUE}💡 빠른 개선${NC}"
-    echo -e "$quickwins"
-fi
-
-echo -e "${BOLD}└─────────────────────────────────────────────────┘${NC}"
+# 토큰 분석 테이블
+echo -e "  ${BOLD}📊 토큰 분석${RESET}"
+echo -e "  ┌────────────────────┬──────────────┬───────────┐"
+echo -e "  │ 구분               │ 토큰         │ 파일 수   │"
+echo -e "  ├────────────────────┼──────────────┼───────────┤"
+printf "  │ 상시 로드 (매 대화) │ ${RED}%10d${RESET}   │ %5d     │\n" "$always_tokens" "$always_files"
+printf "  │ 온디맨드 (필요 시)  │ ${GREEN}%10d${RESET}   │ %5d     │\n" "$ondemand_tokens" "$ondemand_files"
+echo -e "  ├────────────────────┼──────────────┼───────────┤"
+printf "  │ 합계               │ %10d   │ %5d     │\n" "$total_tokens" "$((always_files + ondemand_files))"
+echo -e "  └────────────────────┴──────────────┴───────────┘"
 echo ""
 
-# ─── 5. 최적화 제안 ───
-if [ "$score" -lt 85 ]; then
-    echo -e "${BOLD}개선하시겠습니까?${NC}"
-    echo -e "${DIM}ctxcraft 최적화 도구를 설치하면 Claude Code에서 /optimize 명령으로${NC}"
-    echo -e "${DIM}자동 압축, 중복 제거, 재구조화를 수행할 수 있습니다.${NC}"
+# 검증 결과 테이블
+echo -e "  ${BOLD}📋 검증 결과${RESET}"
+for i in $(seq 0 $((CHECK_IDX - 1))); do
+    num=$((i + 1))
+    name="${CHECK_NAMES[$i]}"
+    status="${CHECK_STATUS[$i]}"
+    case "$status" in
+        PASS) status_display="${GREEN}PASS${RESET}" ;;
+        WARN) status_display="${YELLOW}WARN${RESET}" ;;
+        FAIL) status_display="${RED}FAIL${RESET}" ;;
+    esac
+    printf "  %b  [%d] %s\n" "$status_display" "$num" "$name"
+done
+echo ""
+
+# 절감 가능 토큰
+if [ "$saveable_tokens" -gt 0 ]; then
+    echo -e "  ${BLUE}💡 절감 가능: ~${saveable_tokens} 토큰/대화${RESET}"
     echo ""
-    printf "설치하시겠습니까? (y/n): "
+fi
+
+# ─────────────────────────────────────────────
+# 최종 요약
+# ─────────────────────────────────────────────
+echo -e "${CYAN}${BOLD}━━━ 최종 요약 ━━━${RESET}"
+echo -e "  점수: ${BOLD}${grade_color}${score_100}/100 (${grade})${RESET} — ${grade_color}${grade_msg}${RESET}"
+echo -e "  ${GREEN}PASS${RESET} ${pass_count}개  ${YELLOW}WARN${RESET} ${warn_count}개  ${RED}FAIL${RESET} ${fail_count}개"
+echo ""
+
+# ─────────────────────────────────────────────
+# Phase 3: 최적화 제안
+# ─────────────────────────────────────────────
+if [ "$score_100" -lt 85 ]; then
+    echo -e "${CYAN}${BOLD}━━━ Phase 3: 최적화 ━━━${RESET}\n"
+    echo -e "  ctxcraft 최적화 도구를 설치하면 Claude Code에서"
+    echo -e "  ${BOLD}/optimize${RESET} 명령으로 자동 최적화를 수행할 수 있습니다."
+    echo -e "  ${DIM}(압축, 중복 제거, 재구조화 — 완료 후 자동 삭제)${RESET}"
+    echo ""
+    printf "  설치하시겠습니까? (y/n): "
     read -r REPLY
     echo ""
 
     if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-        echo -e "${CYAN}📥 ctxcraft 최적화 도구 설치 중...${NC}"
+        start_spinner "ctxcraft 최적화 도구 설치 중..."
         TEMP_DIR=$(mktemp -d)
         git clone --quiet --depth 1 "$REPO_URL" "$TEMP_DIR/ctxcraft"
 
-        # skills 복사
         mkdir -p "$CLAUDE_DIR/skills"
         for skill_dir in "$TEMP_DIR/ctxcraft/skills/"*; do
             [ -d "$skill_dir" ] || continue
             skill_name=$(basename "$skill_dir")
             cp -r "$skill_dir" "$CLAUDE_DIR/skills/$skill_name"
-            echo -e "  ✅ skills/${skill_name} 설치됨"
         done
 
-        # agents 복사
         mkdir -p "$CLAUDE_DIR/agents"
         for agent_file in "$TEMP_DIR/ctxcraft/agents/"*; do
             [ -f "$agent_file" ] || continue
-            agent_name=$(basename "$agent_file")
-            cp "$agent_file" "$CLAUDE_DIR/agents/$agent_name"
-            echo -e "  ✅ agents/${agent_name} 설치됨"
+            cp "$agent_file" "$CLAUDE_DIR/agents/"
         done
 
-        # 정리
         rm -rf "$TEMP_DIR"
+        stop_spinner "설치 완료"
 
         echo ""
-        echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${GREEN}✅ 설치 완료!${NC}"
-        echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${BOLD}Claude Code에서 실행하세요:${RESET}"
         echo ""
-        echo "Claude Code에서 다음 명령어를 실행하세요:"
+        echo -e "    ${BOLD}/optimize${RESET}        — 자동 최적화"
+        echo -e "    ${BOLD}/optimize --dry${RESET}  — 미리보기만"
         echo ""
-        echo -e "  ${BOLD}/optimize${NC}        — 평가 결과 기반으로 자동 최적화"
-        echo -e "  ${BOLD}/optimize --dry${NC}  — 변경 미리보기만"
-        echo ""
-        echo -e "${DIM}최적화 완료 후 ctxcraft 파일은 자동으로 삭제됩니다.${NC}"
-        echo ""
+        echo -e "  ${DIM}최적화 완료 후 ctxcraft 파일은 자동으로 삭제됩니다.${RESET}"
     else
-        echo -e "${DIM}설치를 건너뛰었습니다.${NC}"
-        echo "나중에 설치하려면:"
-        echo "  curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | bash"
+        echo -e "  ${DIM}건너뛰었습니다.${RESET}"
+        echo -e "  나중에 다시: ${DIM}curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | bash${RESET}"
     fi
 else
-    echo -e "${GREEN}✅ 이미 잘 최적화되어 있습니다! 추가 작업이 필요 없습니다.${NC}"
+    echo -e "  ${GREEN}✅ 이미 잘 최적화되어 있습니다!${RESET}"
 fi
+
+echo ""
+NORMAL_EXIT=true
