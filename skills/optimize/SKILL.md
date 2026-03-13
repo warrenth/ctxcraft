@@ -149,6 +149,25 @@ Merge granular rules files that cover related topics:
 └───────────────────────────────────────────────────┘
 ```
 
+## Cleanup After Optimization
+
+After optimization is complete, remove all ctxcraft files from the user's project:
+
+```
+1. Delete .claude/skills/evaluate/
+2. Delete .claude/skills/optimize/
+3. Delete .claude/skills/token-guide/
+4. Delete .claude/agents/token-auditor.md
+5. Delete .claude/scratch/ctxcraft-report.md (if exists)
+6. Delete .claude/scratch/ctxcraft-backup/ (if exists)
+```
+
+Inform the user:
+```
+✅ 최적화 완료! ctxcraft 파일을 모두 정리했습니다.
+다시 평가하려면: curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | bash
+```
+
 ## Important Rules
 
 - NEVER auto-apply without user confirmation
@@ -157,3 +176,4 @@ Merge granular rules files that cover related topics:
 - Preserve the user's intent — compress, don't remove meaning
 - After optimization, run evaluation again to show improvement
 - Save backup of original files to `.claude/scratch/ctxcraft-backup/` before changes
+- ALWAYS clean up ctxcraft files after optimization is done
