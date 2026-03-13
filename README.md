@@ -13,54 +13,111 @@ AI 코딩 에이전트(Claude Code, Cursor, Windsurf)는 매 대화마다 컨텍
 - 한 번도 호출되지 않는 미사용 skills/agents
 - 온디맨드로 전환 가능한 상시 로드 파일
 
-## 기능
-
-| 명령어 | 설명 |
-|--------|------|
-| `/evaluate` | `.claude/` 디렉토리 스캔, 토큰 사용량 추정, 효율 점수(0-100) 산출 |
-| `/optimize` | 평가 결과 기반으로 개선 적용 |
-
 ## 빠른 시작
 
-### 방법 1: 설치 스크립트 (권장)
+프로젝트 루트에서 한 줄로 실행:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | bash
 ```
 
-### 방법 2: 수동 복사
+프로젝트에 아무것도 설치되지 않습니다. 평가 후 개선을 원할 때만 도구가 설치됩니다.
 
-```bash
-git clone https://github.com/warrenth/ctxcraft.git
-cp -r ctxcraft/skills/* /path/to/your/project/.claude/skills/
-cp -r ctxcraft/rules/* /path/to/your/project/.claude/rules/
-```
-
-## `/evaluate` 리포트 예시
+## 동작 방식
 
 ```
-┌─────────────────────────────────────────────────┐
-│  ctxcraft — 토큰 효율 리포트                      │
-│                                                  │
-│  점수: 64/100                                    │
-│                                                  │
-│  📊 토큰 분석                                     │
-│  상시 로드 (rules, CLAUDE.md):  ~4,200 토큰       │
-│  온디맨드 (skills, agents):     ~8,500 토큰       │
-│  추정 낭비:                     ~1,800 토큰       │
-│                                                  │
-│  🔴 심각                                         │
-│  • CLAUDE.md 320줄 → 150줄로 압축 가능            │
-│                                                  │
-│  🟡 경고                                         │
-│  • rules 파일 3개에서 내용 중복 감지               │
-│  • 최근 10세션 동안 미참조 skill 4개               │
-│                                                  │
-│  🟢 양호                                         │
-│  • 에이전트 위임 구조가 잘 설계됨                   │
-│  • Skills에 단계적 공개 패턴 적용됨                │
-└─────────────────────────────────────────────────┘
+$ curl -sL .../evaluate.sh | bash
+
+━━━ Phase 1: 토큰 효율 검증 ━━━
+
+  ✓ 스캔 완료 (파일 60개)
+
+[ 1] CLAUDE.md 크기
+     PASS 174줄 (기준: 500줄 이하)
+
+[ 2] 상시 로드 토큰
+     FAIL ~16848 토큰 — 기준 15000 크게 초과
+
+[ 3] Rules 파일 크기
+     FAIL 기준(130줄) 초과 1개: coroutines.md(140줄)
+
+[ 4] Rules 파일 수
+     PASS 13개 (기준: 15개 이하)
+
+[ 5] 중복 섹션
+     WARN 중복 제목 1개 감지
+
+[ 6] 단계적 공개
+     PASS 온디맨드 76% / 상시 24%
+
+[ 7] Skills 파일 크기
+     WARN 기준(250줄) 초과 2개
+
+[ 8] 토큰 배분 비율
+     PASS 상시 24% / 온디맨드 76% — 이상적
+
+━━━ Phase 2: 리포트 ━━━
+
+  📊 토큰 분석
+  ┌────────────────────┬──────────────┬───────────┐
+  │ 구분               │ 토큰         │ 파일 수   │
+  ├────────────────────┼──────────────┼───────────┤
+  │ 상시 로드 (매 대화) │      16848   │    14     │
+  │ 온디맨드 (필요 시)  │      53040   │    46     │
+  ├────────────────────┼──────────────┼───────────┤
+  │ 합계               │      69888   │    60     │
+  └────────────────────┴──────────────┴───────────┘
+
+  📋 검증 결과
+  PASS  [1] CLAUDE.md 크기
+  FAIL  [2] 상시 로드 토큰
+  FAIL  [3] Rules 파일 크기
+  PASS  [4] Rules 파일 수
+  WARN  [5] 중복 섹션
+  PASS  [6] 단계적 공개
+  WARN  [7] Skills 파일 크기
+  PASS  [8] 토큰 배분 비율
+
+  💡 절감 가능: ~9168 토큰/대화
+
+━━━ 최종 요약 ━━━
+  점수: 62/100 (C) — 개선이 필요합니다
+  PASS 4개  WARN 2개  FAIL 2개
+
+━━━ Phase 3: 최적화 ━━━
+
+  개선하시겠습니까? (y/n): y
+
+  ✓ ctxcraft 최적화 도구 설치 완료
+
+  Claude Code에서 실행하세요:
+    /optimize        — 자동 최적화
+    /optimize --dry  — 미리보기만
+
+  최적화 완료 후 ctxcraft 파일은 자동으로 삭제됩니다.
 ```
+
+## 검증 항목
+
+| # | 항목 | 기준 | 측정 내용 |
+|---|------|------|----------|
+| 1 | CLAUDE.md 크기 | 500줄 이하 | 매 대화 로드되는 핵심 파일 |
+| 2 | 상시 로드 토큰 | 8,000 이하 | CLAUDE.md + rules/ 총 토큰 |
+| 3 | Rules 파일 크기 | 100~130줄 | 개별 규칙 파일 적정 크기 |
+| 4 | Rules 파일 수 | 15개 이하 | 너무 많으면 통합 필요 |
+| 5 | 중복 섹션 | 0개 | CLAUDE.md ↔ rules/ 간 겹침 |
+| 6 | 단계적 공개 | 온디맨드 50%+ | 상시 vs 온디맨드 비율 |
+| 7 | Skills 파일 크기 | 250줄 이하 | 개별 스킬 적정 크기 |
+| 8 | 토큰 배분 비율 | 상시 30% 이하 | 전체 대비 상시 로드 비중 |
+
+## 점수 등급
+
+| 등급 | 점수 | 의미 |
+|------|------|------|
+| A | 85+ | 훌륭합니다! |
+| B | 70~84 | 양호합니다 |
+| C | 50~69 | 개선이 필요합니다 |
+| D | 0~49 | 즉시 최적화를 권장합니다 |
 
 ## `/optimize`가 하는 일
 
@@ -68,6 +125,7 @@ cp -r ctxcraft/rules/* /path/to/your/project/.claude/rules/
 2. **중복 제거** — 겹치는 규칙을 단일 소스로 병합
 3. **정리** — 미사용 skills/agents 식별 및 제거
 4. **재구조화** — 상시 로드 콘텐츠를 온디맨드 skills로 이동
+5. **자동 삭제** — 최적화 완료 후 ctxcraft 파일 자동 정리
 
 모든 변경은 적용 전 사용자 확인을 거칩니다.
 
@@ -75,26 +133,15 @@ cp -r ctxcraft/rules/* /path/to/your/project/.claude/rules/
 
 ```
 ctxcraft/
+├── evaluate.sh                 # 원라인 평가 스크립트 (핵심)
 ├── skills/
-│   ├── evaluate/SKILL.md     # /evaluate 명령어
-│   ├── optimize/SKILL.md     # /optimize 명령어
-│   └── token-guide/SKILL.md  # 토큰 효율 레퍼런스
-├── rules/
-│   └── token-efficiency.md   # 상시 로드 효율 규칙
+│   ├── evaluate/SKILL.md       # /evaluate 명령어
+│   ├── optimize/SKILL.md       # /optimize 명령어
+│   └── token-guide/SKILL.md    # 토큰 효율 레퍼런스
 ├── agents/
-│   └── token-auditor.md      # 전용 분석 에이전트
-└── install.sh                # 원라인 설치 스크립트
+│   └── token-auditor.md        # 전용 분석 에이전트
+└── install.sh                  # 설치 스크립트 (레거시)
 ```
-
-## 점수 산정 기준
-
-| 항목 | 가중치 | 측정 내용 |
-|------|--------|----------|
-| 상시 로드 크기 | 30% | rules/ + CLAUDE.md 총 토큰 수 |
-| 중복도 | 25% | 파일 간 콘텐츠 겹침 |
-| 미사용 파일 | 20% | 최근 사용 기록 없는 skills/agents |
-| 단계적 공개 | 15% | 온디맨드 vs 상시 로드 비율 |
-| 구조 | 10% | 네이밍, 구성, 모듈화 |
 
 ## 지원 환경
 
@@ -105,7 +152,7 @@ ctxcraft/
 
 ## 기여
 
-기여를 환영합니다! [CONTRIBUTING.md](CONTRIBUTING.md)를 참고하세요.
+기여를 환영합니다!
 
 ## 라이선스
 
