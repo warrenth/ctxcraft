@@ -18,7 +18,7 @@ AI 코딩 에이전트(Claude Code, Cursor, Windsurf)는 매 대화마다 컨텍
 프로젝트 루트에서 한 줄로 실행:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | bash
+curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 ```
 
 프로젝트에 아무것도 설치되지 않습니다. 평가 후 개선을 원할 때만 도구가 설치됩니다.
@@ -26,7 +26,7 @@ curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | 
 ## 동작 방식
 
 ```
-$ curl -sL .../evaluate.sh | bash
+$ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 
 ━━━ Phase 1: 토큰 효율 검증 ━━━
 
