@@ -106,6 +106,7 @@ declare -a CHECK_NAMES
 declare -a CHECK_STATUS    # PASS / WARN / FAIL
 declare -a CHECK_DETAIL
 declare -a CHECK_TOKENS    # 해당 항목의 토큰 절감 가능량
+declare -a CHECK_HINTS     # 개선 방법 힌트
 
 CHECK_IDX=0
 
@@ -114,10 +115,12 @@ add_result() {
     local status="$2"
     local detail="$3"
     local tokens="${4:-0}"
+    local hint="${5:-}"
     CHECK_NAMES[$CHECK_IDX]="$name"
     CHECK_STATUS[$CHECK_IDX]="$status"
     CHECK_DETAIL[$CHECK_IDX]="$detail"
     CHECK_TOKENS[$CHECK_IDX]="$tokens"
+    CHECK_HINTS[$CHECK_IDX]="$hint"
     CHECK_IDX=$((CHECK_IDX + 1))
 }
 
@@ -286,12 +289,12 @@ echo ""
 
 # [1] CLAUDE.md 크기
 if [ "$claude_md_lines" -eq 0 ]; then
-    add_result "CLAUDE.md 크기" "WARN" "CLAUDE.md 파일 없음" 0
+    add_result "CLAUDE.md 크기" "WARN" "CLAUDE.md 파일 없음" 0 "CLAUDE.md 생성 권장"
 elif [ "$claude_md_lines" -le "$CLAUDE_MD_MAX" ]; then
     add_result "CLAUDE.md 크기" "PASS" "${claude_md_lines}줄 (기준: ${CLAUDE_MD_MAX}줄 이하)" 0
 else
     save=$((claude_md_lines - 150))
-    add_result "CLAUDE.md 크기" "FAIL" "${claude_md_lines}줄 → ${CLAUDE_MD_MAX}줄 이하로 압축 필요" $((save * TOKENS_PER_LINE))
+    add_result "CLAUDE.md 크기" "FAIL" "${claude_md_lines}줄 → ${CLAUDE_MD_MAX}줄 이하로 압축 필요" $((save * TOKENS_PER_LINE)) "중복 설명 제거, 불릿/테이블로 압축"
 fi
 print_check 1 "${CHECK_NAMES[0]}" "${CHECK_STATUS[0]}" "${CHECK_DETAIL[0]}"
 
@@ -299,28 +302,30 @@ print_check 1 "${CHECK_NAMES[0]}" "${CHECK_STATUS[0]}" "${CHECK_DETAIL[0]}"
 if [ "$always_tokens" -le "$ALWAYS_LOADED_WARN" ]; then
     add_result "상시 로드 토큰" "PASS" "~${always_tokens} 토큰 (${always_files}개 파일) — 기준: ${ALWAYS_LOADED_WARN} 이하" 0
 elif [ "$always_tokens" -le "$ALWAYS_LOADED_CRITICAL" ]; then
-    add_result "상시 로드 토큰" "WARN" "~${always_tokens} 토큰 — 기준 ${ALWAYS_LOADED_WARN} 초과" $((always_tokens - ALWAYS_LOADED_WARN))
+    add_result "상시 로드 토큰" "WARN" "~${always_tokens} 토큰 — 기준 ${ALWAYS_LOADED_WARN} 초과" $((always_tokens - ALWAYS_LOADED_WARN)) "rules 파일 압축 또는 skills로 이동"
 else
-    add_result "상시 로드 토큰" "FAIL" "~${always_tokens} 토큰 — 기준 ${ALWAYS_LOADED_CRITICAL} 크게 초과" $((always_tokens - ALWAYS_LOADED_WARN))
+    add_result "상시 로드 토큰" "FAIL" "~${always_tokens} 토큰 — 기준 ${ALWAYS_LOADED_CRITICAL} 크게 초과" $((always_tokens - ALWAYS_LOADED_WARN)) "rules 전체 압축 필요, 절감 가능: ~$((always_tokens - ALWAYS_LOADED_WARN)) 토큰"
 fi
 print_check 2 "${CHECK_NAMES[1]}" "${CHECK_STATUS[1]}" "${CHECK_DETAIL[1]}"
 
 # [3] Rules 파일 크기
 if [ "$rules_count" -eq 0 ]; then
-    add_result "Rules 파일 크기" "WARN" "rules/ 디렉토리 없음" 0
+    add_result "Rules 파일 크기" "WARN" "rules/ 디렉토리 없음" 0 "rules/ 디렉토리 및 규칙 파일 생성 권장"
 elif [ ${#OVERSIZED_RULES[@]} -eq 0 ]; then
     add_result "Rules 파일 크기" "PASS" "모든 rules 파일 ${RULES_MAX}줄 이하 (${rules_count}개, 권장 ${RULES_MIN}~${RULES_MAX}줄)" 0
 else
     detail="기준(${RULES_MAX}줄) 초과 ${#OVERSIZED_RULES[@]}개:"
+    hint_files=""
     save_tokens=0
     for entry in "${OVERSIZED_RULES[@]}"; do
         name="${entry%%:*}"
         lines="${entry##*:}"
         detail="${detail} ${name}(${lines}줄)"
+        hint_files="${hint_files}${name} "
         excess=$((lines - RULES_MAX))
         save_tokens=$((save_tokens + excess * TOKENS_PER_LINE))
     done
-    add_result "Rules 파일 크기" "FAIL" "$detail" "$save_tokens"
+    add_result "Rules 파일 크기" "FAIL" "$detail" "$save_tokens" "${hint_files% }— 예시/설명 제거 또는 skills로 이동"
 fi
 print_check 3 "${CHECK_NAMES[2]}" "${CHECK_STATUS[2]}" "${CHECK_DETAIL[2]}"
 
@@ -328,7 +333,7 @@ print_check 3 "${CHECK_NAMES[2]}" "${CHECK_STATUS[2]}" "${CHECK_DETAIL[2]}"
 if [ "$rules_count" -le "$RULES_COUNT_MAX" ]; then
     add_result "Rules 파일 수" "PASS" "${rules_count}개 (기준: ${RULES_COUNT_MAX}개 이하)" 0
 else
-    add_result "Rules 파일 수" "WARN" "${rules_count}개 → 5~8개로 통합 권장" 0
+    add_result "Rules 파일 수" "WARN" "${rules_count}개 → 5~8개로 통합 권장" 0 "주제 유사한 rules 파일 병합"
 fi
 print_check 4 "${CHECK_NAMES[3]}" "${CHECK_STATUS[3]}" "${CHECK_DETAIL[3]}"
 
@@ -344,9 +349,9 @@ fi
 if [ "$dup_count" -eq 0 ]; then
     add_result "중복 섹션" "PASS" "CLAUDE.md ↔ rules/ 간 중복 섹션 없음" 0
 elif [ "$dup_count" -le 2 ]; then
-    add_result "중복 섹션" "WARN" "중복 제목 ${dup_count}개 감지: $(echo "$dup_headings" | tr '\n' ', ')" $((dup_count * 200))
+    add_result "중복 섹션" "WARN" "중복 제목 ${dup_count}개 감지: $(echo "$dup_headings" | tr '\n' ', ')" $((dup_count * 200)) "한 곳만 남기고 나머지 섹션 제거"
 else
-    add_result "중복 섹션" "FAIL" "중복 제목 ${dup_count}개 감지: $(echo "$dup_headings" | tr '\n' ', ')" $((dup_count * 200))
+    add_result "중복 섹션" "FAIL" "중복 제목 ${dup_count}개 감지: $(echo "$dup_headings" | tr '\n' ', ')" $((dup_count * 200)) "한 곳만 남기고 나머지 섹션 제거"
 fi
 print_check 5 "${CHECK_NAMES[4]}" "${CHECK_STATUS[4]}" "${CHECK_DETAIL[4]}"
 
@@ -356,10 +361,10 @@ if [ "$ondemand_files" -gt 0 ] && [ "$always_files" -gt 0 ]; then
     if [ "$ratio" -ge 50 ]; then
         add_result "단계적 공개" "PASS" "온디맨드 ${ratio}% (${ondemand_files}개) / 상시 $((100 - ratio))% (${always_files}개)" 0
     else
-        add_result "단계적 공개" "WARN" "온디맨드 ${ratio}% — 상시 로드 비중이 높음" 0
+        add_result "단계적 공개" "WARN" "온디맨드 ${ratio}% — 상시 로드 비중이 높음" 0 "rules 일부를 skills로 이동하여 온디맨드 비율 높이기"
     fi
 elif [ "$ondemand_files" -eq 0 ] && [ "$always_files" -gt 3 ]; then
-    add_result "단계적 공개" "FAIL" "skills/agents 없음 — 모든 콘텐츠가 상시 로드" 0
+    add_result "단계적 공개" "FAIL" "skills/agents 없음 — 모든 콘텐츠가 상시 로드" 0 "skills/ 생성 후 framework별 심화 내용 이동"
 else
     add_result "단계적 공개" "PASS" "구조 적절" 0
 fi
@@ -372,12 +377,14 @@ elif [ ${#OVERSIZED_SKILLS[@]} -eq 0 ]; then
     add_result "Skills 파일 크기" "PASS" "모든 SKILL.md ${SKILLS_MAX}줄 이하 (${skills_count}개)" 0
 else
     detail="기준(${SKILLS_MAX}줄) 초과 ${#OVERSIZED_SKILLS[@]}개:"
+    hint_files=""
     for entry in "${OVERSIZED_SKILLS[@]}"; do
         name="${entry%%:*}"
         lines="${entry##*:}"
         detail="${detail} ${name}(${lines}줄)"
+        hint_files="${hint_files}${name} "
     done
-    add_result "Skills 파일 크기" "WARN" "$detail" 0
+    add_result "Skills 파일 크기" "WARN" "$detail" 0 "${hint_files% }— 상세 내용을 references/ 하위 폴더로 분리"
 fi
 print_check 7 "${CHECK_NAMES[6]}" "${CHECK_STATUS[6]}" "${CHECK_DETAIL[6]}"
 
@@ -387,12 +394,12 @@ if [ "$total_tokens" -gt 0 ]; then
     if [ "$always_pct" -le 30 ]; then
         add_result "토큰 배분 비율" "PASS" "상시 ${always_pct}% / 온디맨드 $((100 - always_pct))% — 이상적" 0
     elif [ "$always_pct" -le 50 ]; then
-        add_result "토큰 배분 비율" "WARN" "상시 ${always_pct}% / 온디맨드 $((100 - always_pct))% — 상시 비중 높음" 0
+        add_result "토큰 배분 비율" "WARN" "상시 ${always_pct}% / 온디맨드 $((100 - always_pct))% — 상시 비중 높음" 0 "rules 내 심화 내용을 skills로 이동"
     else
-        add_result "토큰 배분 비율" "FAIL" "상시 ${always_pct}% / 온디맨드 $((100 - always_pct))% — 상시 비중 과다" 0
+        add_result "토큰 배분 비율" "FAIL" "상시 ${always_pct}% / 온디맨드 $((100 - always_pct))% — 상시 비중 과다" 0 "상시 로드 파일 전면 축소 필요"
     fi
 else
-    add_result "토큰 배분 비율" "WARN" "분석할 파일 없음" 0
+    add_result "토큰 배분 비율" "WARN" "분석할 파일 없음" 0 "rules/ 또는 CLAUDE.md 추가 필요"
 fi
 print_check 8 "${CHECK_NAMES[7]}" "${CHECK_STATUS[7]}" "${CHECK_DETAIL[7]}"
 
@@ -421,7 +428,7 @@ if [ "$agents_count" -eq 0 ]; then
 elif [ "$agent_bad" -eq 0 ]; then
     add_result "Agent Frontmatter" "PASS" "모든 agent 파일 YAML frontmatter 유효 (${agents_count}개)" 0
 else
-    add_result "Agent Frontmatter" "WARN" "frontmatter 누락/불완전 ${agent_bad}개:${agent_bad_list}" 0
+    add_result "Agent Frontmatter" "WARN" "frontmatter 누락/불완전 ${agent_bad}개:${agent_bad_list}" 0 "파일 최상단에 ---...--- YAML 블록 추가"
 fi
 print_check 9 "${CHECK_NAMES[8]}" "${CHECK_STATUS[8]}" "${CHECK_DETAIL[8]}"
 
@@ -446,7 +453,7 @@ if [ "$agents_count" -eq 0 ]; then
 elif [ "$agent_missing_fields" -eq 0 ]; then
     add_result "Agent 필수 필드" "PASS" "모든 agent 파일 필수 필드(name/description/tools) 존재 (${agents_count}개)" 0
 else
-    add_result "Agent 필수 필드" "WARN" "필수 필드 누락 ${agent_missing_fields}개:${agent_missing_list}" 0
+    add_result "Agent 필수 필드" "WARN" "필수 필드 누락 ${agent_missing_fields}개:${agent_missing_list}" 0 "frontmatter에 name:/description:/tools: 필드 추가"
 fi
 print_check 10 "${CHECK_NAMES[9]}" "${CHECK_STATUS[9]}" "${CHECK_DETAIL[9]}"
 
@@ -476,7 +483,7 @@ if [ "$skills_count" -eq 0 ]; then
 elif [ "$skill_bad" -eq 0 ]; then
     add_result "Skill Frontmatter" "PASS" "모든 SKILL.md frontmatter 유효 (${skills_count}개)" 0
 else
-    add_result "Skill Frontmatter" "WARN" "frontmatter 누락/불완전 ${skill_bad}개:${skill_bad_list}" 0
+    add_result "Skill Frontmatter" "WARN" "frontmatter 누락/불완전 ${skill_bad}개:${skill_bad_list}" 0 "SKILL.md 최상단에 name:/description:/command: YAML 블록 추가"
 fi
 print_check 11 "${CHECK_NAMES[10]}" "${CHECK_STATUS[10]}" "${CHECK_DETAIL[10]}"
 
@@ -504,7 +511,7 @@ if [ "$skills_count" -eq 0 ]; then
 elif [ "$skill_ref_broken" -eq 0 ]; then
     add_result "Skill References 링크" "PASS" "모든 references 링크 유효" 0
 else
-    add_result "Skill References 링크" "WARN" "존재하지 않는 references ${skill_ref_broken}개:${skill_ref_list}" 0
+    add_result "Skill References 링크" "WARN" "존재하지 않는 references ${skill_ref_broken}개:${skill_ref_list}" 0 "references/ 파일 생성 또는 SKILL.md 링크 경로 수정"
 fi
 print_check 12 "${CHECK_NAMES[11]}" "${CHECK_STATUS[11]}" "${CHECK_DETAIL[11]}"
 
@@ -529,9 +536,9 @@ if [ "$rules_count" -eq 0 ]; then
 elif [ "$rules_without_ref" -eq 0 ]; then
     add_result "Rules 스킬 참조" "PASS" "모든 rules 파일에 skills 참조 포함 (${rules_with_ref}개)" 0
 elif [ "$rules_without_ref" -le $((rules_count / 2)) ]; then
-    add_result "Rules 스킬 참조" "WARN" "skills 참조 없는 rules ${rules_without_ref}개:${rules_without_list}" 0
+    add_result "Rules 스킬 참조" "WARN" "skills 참조 없는 rules ${rules_without_ref}개:${rules_without_list}" 0 "${rules_without_list% }— 하단에 '> 심화: /skill-name' 한 줄 추가"
 else
-    add_result "Rules 스킬 참조" "WARN" "절반 이상의 rules에 skills 참조 없음 (${rules_without_ref}/${rules_count}개)" 0
+    add_result "Rules 스킬 참조" "WARN" "절반 이상의 rules에 skills 참조 없음 (${rules_without_ref}/${rules_count}개)" 0 "각 rules 파일 하단에 '> 심화: /관련-skill' 참조 추가"
 fi
 print_check 13 "${CHECK_NAMES[12]}" "${CHECK_STATUS[12]}" "${CHECK_DETAIL[12]}"
 
@@ -553,7 +560,7 @@ if [ "$rules_count" -eq 0 ]; then
 elif [ "$rules_with_yaml" -eq 0 ]; then
     add_result "Rules 순수 Markdown" "PASS" "모든 rules 파일 순수 Markdown (YAML frontmatter 없음)" 0
 else
-    add_result "Rules 순수 Markdown" "FAIL" "YAML frontmatter 있는 rules ${rules_with_yaml}개:${rules_yaml_list} — rules는 frontmatter 불필요" 0
+    add_result "Rules 순수 Markdown" "FAIL" "YAML frontmatter 있는 rules ${rules_with_yaml}개:${rules_yaml_list} — rules는 frontmatter 불필요" 0 "${rules_yaml_list% }— 파일 상단의 ---...--- 블록 제거"
 fi
 print_check 14 "${CHECK_NAMES[13]}" "${CHECK_STATUS[13]}" "${CHECK_DETAIL[13]}"
 
@@ -573,7 +580,7 @@ fi
 if [ "$orphan_skills" -eq 0 ]; then
     add_result "Skills 고아 디렉토리" "PASS" "모든 skills/ 하위 폴더에 SKILL.md 존재" 0
 else
-    add_result "Skills 고아 디렉토리" "WARN" "SKILL.md 없는 폴더 ${orphan_skills}개:${orphan_list} — 미작동 skill" 0
+    add_result "Skills 고아 디렉토리" "WARN" "SKILL.md 없는 폴더 ${orphan_skills}개:${orphan_list} — 미작동 skill" 0 "${orphan_list% }— SKILL.md 생성 또는 폴더 삭제"
 fi
 print_check 15 "${CHECK_NAMES[14]}" "${CHECK_STATUS[14]}" "${CHECK_DETAIL[14]}"
 
@@ -590,7 +597,7 @@ fi
 if [ "$rules_subdir" -eq 0 ]; then
     add_result "Rules 평면 구조" "PASS" "rules/ 하위 디렉토리 없음 — 올바른 구조" 0
 else
-    add_result "Rules 평면 구조" "FAIL" "rules/ 안에 하위 디렉토리 ${rules_subdir}개:${rules_subdir_list} — rules는 flat .md 파일만 허용" 0
+    add_result "Rules 평면 구조" "FAIL" "rules/ 안에 하위 디렉토리 ${rules_subdir}개:${rules_subdir_list} — rules는 flat .md 파일만 허용" 0 "${rules_subdir_list% }— 하위 폴더 제거 후 .md 파일을 rules/ 루트로 이동"
 fi
 print_check 16 "${CHECK_NAMES[15]}" "${CHECK_STATUS[15]}" "${CHECK_DETAIL[15]}"
 
@@ -655,20 +662,31 @@ printf "  │ 합계               │ %10d   │ %5d     │\n" "$total_tokens"
 echo -e "  └────────────────────┴──────────────┴───────────┘"
 echo ""
 
-# 검증 결과 테이블
-echo -e "  ${BOLD}📋 검증 결과${RESET}"
+# 개선 필요 항목 (FAIL/WARN만 표시)
+has_issues=false
 for i in $(seq 0 $((CHECK_IDX - 1))); do
-    num=$((i + 1))
-    name="${CHECK_NAMES[$i]}"
-    status="${CHECK_STATUS[$i]}"
-    case "$status" in
-        PASS) status_display="${GREEN}PASS${RESET}" ;;
-        WARN) status_display="${YELLOW}WARN${RESET}" ;;
-        FAIL) status_display="${RED}FAIL${RESET}" ;;
-    esac
-    printf "  %b  [%d] %s\n" "$status_display" "$num" "$name"
+    [[ "${CHECK_STATUS[$i]}" == "PASS" ]] && continue
+    has_issues=true
+    break
 done
-echo ""
+
+if [ "$has_issues" = true ]; then
+    echo -e "  ${BOLD}📋 개선 필요 항목${RESET}"
+    for i in $(seq 0 $((CHECK_IDX - 1))); do
+        status="${CHECK_STATUS[$i]}"
+        [[ "$status" == "PASS" ]] && continue
+        num=$((i + 1))
+        name="${CHECK_NAMES[$i]}"
+        hint="${CHECK_HINTS[$i]}"
+        hint_str=""
+        [ -n "$hint" ] && hint_str="  ${DIM}→ ${hint}${RESET}"
+        case "$status" in
+            WARN) printf "  ${YELLOW}WARN${RESET}  [%2d] %-22s%b\n" "$num" "$name" "$hint_str" ;;
+            FAIL) printf "  ${RED}FAIL${RESET}  [%2d] %-22s%b\n" "$num" "$name" "$hint_str" ;;
+        esac
+    done
+    echo ""
+fi
 
 # 절감 가능 토큰
 if [ "$saveable_tokens" -gt 0 ]; then
