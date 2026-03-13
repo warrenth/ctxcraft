@@ -560,6 +560,43 @@ else
 fi
 print_check 14 "${CHECK_NAMES[13]}" "${CHECK_STATUS[13]}" "${CHECK_DETAIL[13]}"
 
+# [15] Skills 고아 디렉토리 (SKILL.md 없는 skills/ 하위 폴더)
+orphan_skills=0
+orphan_list=""
+if [ -d "$CLAUDE_DIR/skills" ]; then
+    for skill_dir in "$CLAUDE_DIR/skills/"*/; do
+        [ -d "$skill_dir" ] || continue
+        skill_name=$(basename "$skill_dir")
+        if [ ! -f "${skill_dir}SKILL.md" ]; then
+            orphan_skills=$((orphan_skills + 1))
+            orphan_list="${orphan_list} ${skill_name}"
+        fi
+    done
+fi
+if [ "$orphan_skills" -eq 0 ]; then
+    add_result "Skills 고아 디렉토리" "PASS" "모든 skills/ 하위 폴더에 SKILL.md 존재" 0
+else
+    add_result "Skills 고아 디렉토리" "WARN" "SKILL.md 없는 폴더 ${orphan_skills}개:${orphan_list} — 미작동 skill" 0
+fi
+print_check 15 "${CHECK_NAMES[14]}" "${CHECK_STATUS[14]}" "${CHECK_DETAIL[14]}"
+
+# [16] Rules 평면 구조 (하위 디렉토리 없어야 함)
+rules_subdir=0
+rules_subdir_list=""
+if [ -d "$CLAUDE_DIR/rules" ]; then
+    for d in "$CLAUDE_DIR/rules/"*/; do
+        [ -d "$d" ] || continue
+        rules_subdir=$((rules_subdir + 1))
+        rules_subdir_list="${rules_subdir_list} $(basename "$d")"
+    done
+fi
+if [ "$rules_subdir" -eq 0 ]; then
+    add_result "Rules 평면 구조" "PASS" "rules/ 하위 디렉토리 없음 — 올바른 구조" 0
+else
+    add_result "Rules 평면 구조" "FAIL" "rules/ 안에 하위 디렉토리 ${rules_subdir}개:${rules_subdir_list} — rules는 flat .md 파일만 허용" 0
+fi
+print_check 16 "${CHECK_NAMES[15]}" "${CHECK_STATUS[15]}" "${CHECK_DETAIL[15]}"
+
 # ─────────────────────────────────────────────
 # Phase 2: 리포트 요약
 # ─────────────────────────────────────────────

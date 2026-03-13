@@ -106,6 +106,40 @@ Move always-loaded content to on-demand skills:
 > Deep dive: /compose-performance-audit
 ```
 
+### Strategy 6: Skills References 분리
+
+SKILL.md가 250줄을 초과하면 상세 내용을 `references/` 하위 폴더로 분리:
+
+**분리 대상:**
+- 긴 코드 예시와 템플릿
+- 심화 설명 및 Best Practice 목록
+- 설정 옵션 레퍼런스
+
+**Action:** SKILL.md에 핵심 지시만 남기고, 상세 내용은 `references/*.md`로 이동 후 SKILL.md 하단에 참조 링크 추가.
+
+**Before (skills/compose-navigation/SKILL.md — 258줄):**
+```markdown
+## Advanced Patterns
+[150줄의 상세 예시와 딥다이브 내용]
+```
+
+**After (skills/compose-navigation/SKILL.md — 80줄):**
+```markdown
+## Advanced Patterns
+- 핵심 규칙 3줄 요약
+> 심화: references/navigation-advanced.md
+```
+
+**After (skills/compose-navigation/references/navigation-advanced.md — 180줄):**
+```markdown
+# Navigation 심화 가이드
+[기존 상세 내용]
+```
+
+**대상 조건:**
+- SKILL.md > 250줄이고
+- 분리 가능한 독립적 섹션이 존재할 때
+
 ### Strategy 5: Rule Consolidation
 
 Merge granular rules files that cover related topics:

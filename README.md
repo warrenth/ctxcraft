@@ -145,6 +145,8 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 | 12 | Skill References 링크 | 파일 실제 존재 | references/*.md 링크 유효성 |
 | 13 | Rules 스킬 참조 | `>` 참조 패턴 포함 | rules 하단 심화 skills 참조 여부 |
 | 14 | Rules 순수 Markdown | YAML frontmatter 없음 | rules는 frontmatter 불필요 |
+| 15 | Skills 고아 디렉토리 | SKILL.md 반드시 존재 | skills/xxx/ 있는데 SKILL.md 없으면 미작동 |
+| 16 | Rules 평면 구조 | 하위 디렉토리 없음 | rules/는 flat .md 파일만 허용 |
 
 ## 점수 등급
 
