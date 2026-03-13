@@ -148,11 +148,36 @@ echo -e "  디렉토리: ${BOLD}$(pwd)/${CLAUDE_DIR}${RESET}"
 echo ""
 
 # .claude 확인
+no_agent_system=false
+
 if [ ! -d "$CLAUDE_DIR" ]; then
-    echo -e "${RED}❌ .claude/ 디렉토리를 찾을 수 없습니다.${RESET}"
-    echo "   프로젝트 루트 디렉토리에서 실행해주세요."
+    no_agent_system=true
+elif [ ! -d "$CLAUDE_DIR/rules" ] && [ ! -d "$CLAUDE_DIR/skills" ]; then
+    no_agent_system=true
+elif [ ! -d "$CLAUDE_DIR/rules" ] && [ ! -d "$CLAUDE_DIR/skills" ]; then
+    no_agent_system=true
+else
+    # rules, skills 디렉토리가 있어도 파일이 없으면
+    rules_md_count=$(find "$CLAUDE_DIR/rules" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+    skills_md_count=$(find "$CLAUDE_DIR/skills" -name "SKILL.md" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$rules_md_count" -eq 0 ] && [ "$skills_md_count" -eq 0 ]; then
+        no_agent_system=true
+    fi
+fi
+
+if [ "$no_agent_system" = true ]; then
+    echo -e "${GREEN}${BOLD}━━━ 최종 요약 ━━━${RESET}"
+    echo ""
+    echo -e "  점수: ${GREEN}${BOLD}100/100 (A) — 토큰 낭비 없음${RESET}"
+    echo ""
+    echo -e "  ${YELLOW}아직 에이전트 시스템을 사용하고 계시지 않군요.${RESET}"
+    echo -e "  ${DIM}.claude/rules, .claude/skills 가 없으면 낭비할 토큰도 없습니다.${RESET}"
+    echo ""
+    echo -e "  Claude Code 에이전트 시스템을 시작하고 싶다면:"
+    echo -e "  ${DIM}https://github.com/warrenth/ctxcraft${RESET}"
+    echo ""
     NORMAL_EXIT=true
-    exit 1
+    exit 0
 fi
 
 # ─────────────────────────────────────────────
