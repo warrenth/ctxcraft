@@ -132,6 +132,8 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 | 18 | Agent Tools 최소권한 | reviewer/auditor/architect/planner에 Write/Edit 금지 | 분석 전용 에이전트 최소 권한 원칙 |
 | 19 | Rules 강제성 키워드 | MUST/SHOULD/NEVER 구조 | RFC 2119 스타일 규칙 작성 여부 |
 | 20 | CLAUDE.md ↔ Skills 동기화 | 언급된 skill 실존 | CLAUDE.md backtick 스킬명과 skills/ 디렉토리 일치 여부 |
+| 21 | 자동 학습 시스템 | lessons-learned + MEMORY + hooks/ | 반복 패턴을 rules로 승격 → 장기 토큰 절감 여부 |
+| 22 | Agent Model 명시 | model 필드 명시 | reviewer→opus, 단순 작업→haiku 지정으로 비용 최적화 여부 |
 
 ## 점수 등급
 

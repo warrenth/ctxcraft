@@ -722,6 +722,52 @@ else
 fi
 print_check 20 "${CHECK_NAMES[19]}" "${CHECK_STATUS[19]}" "${CHECK_DETAIL[19]}"
 
+# [21] 자동 학습 시스템 (lessons-learned + MEMORY.md + hooks/)
+learning_score=0
+learning_missing=""
+[ -f "$CLAUDE_DIR/scratch/lessons-learned.md" ] && learning_score=$((learning_score + 1)) || learning_missing="${learning_missing} lessons-learned.md"
+[ -f "$CLAUDE_DIR/MEMORY.md" ]                  && learning_score=$((learning_score + 1)) || learning_missing="${learning_missing} MEMORY.md"
+[ -d "$CLAUDE_DIR/hooks" ]                       && learning_score=$((learning_score + 1)) || learning_missing="${learning_missing} hooks/"
+if [ "$learning_score" -eq 3 ]; then
+    add_result "자동 학습 시스템" "PASS" "lessons-learned.md + MEMORY.md + hooks/ 모두 존재 — 장기 토큰 절감 활성화됨" 0
+elif [ "$learning_score" -ge 1 ]; then
+    add_result "자동 학습 시스템" "WARN" "일부 누락:${learning_missing}" 0 "누락 항목 추가 시 반복 실수 감소 → 장기 컨텍스트 절감"
+else
+    add_result "자동 학습 시스템" "WARN" "학습 시스템 없음 (lessons-learned, MEMORY, hooks 모두 없음)" 0 "구축하면 반복 패턴이 rules로 승격 → 불필요한 설명 제거 가능"
+fi
+print_check 21 "${CHECK_NAMES[20]}" "${CHECK_STATUS[20]}" "${CHECK_DETAIL[20]}"
+
+# [22] Agent Model 명시 (model 필드 없으면 비용 최적화 기회 손실)
+agent_no_model=0
+agent_no_model_list=""
+agent_reviewer_not_opus=""
+if [ -d "$CLAUDE_DIR/agents" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        agent_base=$(basename "$f" .md)
+        model_val=$(grep "^model:" "$f" 2>/dev/null | head -1 | sed 's/^model:[[:space:]]*//' | tr -d ' ' || true)
+        if [ -z "$model_val" ]; then
+            agent_no_model=$((agent_no_model + 1))
+            agent_no_model_list="${agent_no_model_list} ${agent_base}"
+        else
+            # reviewer 패턴인데 opus 아니면 별도 경고
+            if echo "$agent_base" | grep -qi "reviewer" && [ "$model_val" != "opus" ]; then
+                agent_reviewer_not_opus="${agent_base}(${model_val})"
+            fi
+        fi
+    done < <(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null)
+fi
+if [ "$agents_count" -eq 0 ]; then
+    add_result "Agent Model 명시" "PASS" "agents 없음 (해당 없음)" 0
+elif [ "$agent_no_model" -eq 0 ] && [ -z "$agent_reviewer_not_opus" ]; then
+    add_result "Agent Model 명시" "PASS" "모든 agent에 model 필드 명시됨 — 비용 최적화 활성화" 0
+elif [ -n "$agent_reviewer_not_opus" ]; then
+    add_result "Agent Model 명시" "WARN" "code-reviewer model이 opus가 아님: ${agent_reviewer_not_opus}" 0 "reviewer는 model: opus 권장 (복잡한 추론), 단순 에이전트는 haiku로 절감"
+else
+    add_result "Agent Model 명시" "WARN" "model 미명시 ${agent_no_model}개:${agent_no_model_list}" 0 "reviewer→opus, 단순 작업→haiku 지정 시 비용 절감 가능"
+fi
+print_check 22 "${CHECK_NAMES[21]}" "${CHECK_STATUS[21]}" "${CHECK_DETAIL[21]}"
+
 # ─────────────────────────────────────────────
 # Phase 2: 리포트 요약
 # ─────────────────────────────────────────────
