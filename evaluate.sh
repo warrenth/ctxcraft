@@ -12,13 +12,14 @@ ROOT_CLAUDE="CLAUDE.md"
 REPO_URL="https://github.com/warrenth/ctxcraft.git"
 TOKENS_PER_LINE=12
 
-CLAUDE_MD_MAX=200
-RULES_MAX=80
-SKILLS_MAX=150
-AGENTS_MAX=120
-ALWAYS_LOADED_WARN=4000
-ALWAYS_LOADED_CRITICAL=6000
-RULES_COUNT_MAX=10
+CLAUDE_MD_MAX=500
+RULES_MAX=130
+RULES_MIN=80
+SKILLS_MAX=250
+AGENTS_MAX=150
+ALWAYS_LOADED_WARN=8000
+ALWAYS_LOADED_CRITICAL=15000
+RULES_COUNT_MAX=15
 DUP_HEADING_THRESHOLD=1
 
 # ─────────────────────────────────────────────
@@ -271,7 +272,7 @@ print_check 2 "${CHECK_NAMES[1]}" "${CHECK_STATUS[1]}" "${CHECK_DETAIL[1]}"
 if [ "$rules_count" -eq 0 ]; then
     add_result "Rules 파일 크기" "WARN" "rules/ 디렉토리 없음" 0
 elif [ ${#OVERSIZED_RULES[@]} -eq 0 ]; then
-    add_result "Rules 파일 크기" "PASS" "모든 rules 파일 ${RULES_MAX}줄 이하 (${rules_count}개)" 0
+    add_result "Rules 파일 크기" "PASS" "모든 rules 파일 ${RULES_MAX}줄 이하 (${rules_count}개, 권장 ${RULES_MIN}~${RULES_MAX}줄)" 0
 else
     detail="기준(${RULES_MAX}줄) 초과 ${#OVERSIZED_RULES[@]}개:"
     save_tokens=0
