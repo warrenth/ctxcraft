@@ -174,9 +174,9 @@ no_agent_system=false
 if [ ! -d "$CLAUDE_DIR" ]; then
     no_agent_system=true
 else
-    rules_md_count=$(find "$CLAUDE_DIR/rules" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-    skills_md_count=$(find "$CLAUDE_DIR/skills" -name "SKILL.md" 2>/dev/null | wc -l | tr -d ' ')
-    agents_md_count=$(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+    rules_md_count=$({ find "$CLAUDE_DIR/rules" -name "*.md" 2>/dev/null || true; } | wc -l | tr -d ' ')
+    skills_md_count=$({ find "$CLAUDE_DIR/skills" -name "SKILL.md" 2>/dev/null || true; } | wc -l | tr -d ' ')
+    agents_md_count=$({ find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null || true; } | wc -l | tr -d ' ')
     if [ "$rules_md_count" -eq 0 ] && [ "$skills_md_count" -eq 0 ] && [ "$agents_md_count" -eq 0 ]; then
         no_agent_system=true
     fi
@@ -722,18 +722,48 @@ else
 fi
 print_check 20 "${CHECK_NAMES[19]}" "${CHECK_STATUS[19]}" "${CHECK_DETAIL[19]}"
 
-# [21] 자동 학습 시스템 (lessons-learned + MEMORY.md + hooks/)
-learning_score=0
-learning_missing=""
-[ -f "$CLAUDE_DIR/scratch/lessons-learned.md" ] && learning_score=$((learning_score + 1)) || learning_missing="${learning_missing} lessons-learned.md"
-[ -f "$CLAUDE_DIR/MEMORY.md" ]                  && learning_score=$((learning_score + 1)) || learning_missing="${learning_missing} MEMORY.md"
-[ -d "$CLAUDE_DIR/hooks" ]                       && learning_score=$((learning_score + 1)) || learning_missing="${learning_missing} hooks/"
-if [ "$learning_score" -eq 3 ]; then
-    add_result "자동 학습 시스템" "PASS" "lessons-learned.md + MEMORY.md + hooks/ 모두 존재 — 장기 토큰 절감 활성화됨" 0
-elif [ "$learning_score" -ge 1 ]; then
-    add_result "자동 학습 시스템" "WARN" "일부 누락:${learning_missing}" 0 "누락 항목 추가 시 반복 실수 감소 → 장기 컨텍스트 절감"
+# [21] 자동 학습 시스템 (Memory / Auto-trigger / 승격 시스템)
+
+# ① Memory — 파일/디렉토리에 memory·lessons·learned 패턴 (느슨하게)
+has_memory=false
+_mem_files=$(find "$CLAUDE_DIR" -name "*.md" 2>/dev/null)
+if [ -n "$_mem_files" ]; then
+    echo "$_mem_files" | while IFS= read -r _f; do
+        grep -qiE "Learned Patterns|lessons-learned|^# Memory|^## Memory" "$_f" 2>/dev/null && echo found && break
+    done | grep -q found && has_memory=true || true
+fi
+{ find "$CLAUDE_DIR" -type d 2>/dev/null | grep -qiE "memory|memo"; } && has_memory=true || true
+
+# ② Auto-trigger — hooks/에 .sh 파일 1개 이상
+has_hooks=false
+{ [ -d "$CLAUDE_DIR/hooks" ] && find "$CLAUDE_DIR/hooks" -name "*.sh" 2>/dev/null | grep -q .; } && has_hooks=true || true
+
+# ③ 승격/학습 시스템 — promote·loop·detect·learn 이름의 skill 디렉토리 또는 agent 내용
+has_promotion=false
+{ find "$CLAUDE_DIR/skills" -type d 2>/dev/null | grep -qiE "promote|loop|detect|learn"; } && has_promotion=true || true
+if [ "$has_promotion" = false ] && [ -d "$CLAUDE_DIR/agents" ]; then
+    _agt_files=$(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null)
+    if [ -n "$_agt_files" ]; then
+        echo "$_agt_files" | while IFS= read -r _f; do
+            grep -qiE "promote|learning.loop|자동 학습|auto.learn" "$_f" 2>/dev/null && echo found && break
+        done | grep -q found && has_promotion=true || true
+    fi
+fi
+
+# 점수 집계 — 없어도 패널티 없음(항상 PASS), 있으면 더 좋은 메시지
+learn_score=0
+learn_found=""
+learn_missing=""
+[ "$has_memory"    = true ] && { learn_score=$((learn_score + 1)); learn_found="${learn_found} Memory✓"; }    || learn_missing="${learn_missing} Memory"
+[ "$has_hooks"     = true ] && { learn_score=$((learn_score + 1)); learn_found="${learn_found} Hooks✓"; }     || learn_missing="${learn_missing} Hooks"
+[ "$has_promotion" = true ] && { learn_score=$((learn_score + 1)); learn_found="${learn_found} Promote✓"; }   || learn_missing="${learn_missing} Promote"
+
+if [ "$learn_score" -eq 3 ]; then
+    add_result "자동 학습 시스템" "PASS" "완전 구축됨 —${learn_found} — 반복 패턴 자동 승격으로 장기 토큰 절감 활성화" 0
+elif [ "$learn_score" -ge 1 ]; then
+    add_result "자동 학습 시스템" "PASS" "부분 구축됨 (${learn_score}/3) —${learn_found} / 미감지:${learn_missing}" 0
 else
-    add_result "자동 학습 시스템" "WARN" "학습 시스템 없음 (lessons-learned, MEMORY, hooks 모두 없음)" 0 "구축하면 반복 패턴이 rules로 승격 → 불필요한 설명 제거 가능"
+    add_result "자동 학습 시스템" "PASS" "미구축 (선택사항) — 구축 시 반복 패턴이 rules로 승격 → 장기 토큰 절감 가능" 0
 fi
 print_check 21 "${CHECK_NAMES[20]}" "${CHECK_STATUS[20]}" "${CHECK_DETAIL[20]}"
 
