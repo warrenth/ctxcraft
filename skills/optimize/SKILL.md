@@ -185,24 +185,24 @@ Merge granular rules files that cover related topics:
 └───────────────────────────────────────────────────┘
 ```
 
-## Before/After 비교 리포트
+## Before/After Comparison Report
 
-모든 변경 적용 후 반드시 `/evaluate`를 재실행하고 아래 형식으로 비교를 출력한다:
+After all changes are applied, you MUST re-run `/evaluate` and display the comparison in this format:
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  ctxcraft — 최적화 완료                               │
-│                                                      │
-│           Before      After      절감                │
-│  점수      75/100  →  91/100   (+16점)               │
-│  상시토큰  16,848  →   9,200   (-7,648 토큰/대화)    │
-│  등급      B       →  A                              │
-│                                                      │
-│  PASS 9개 → 13개   WARN 3개 → 1개   FAIL 2개 → 0개  │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  ctxcraft — Optimization Complete                       │
+│                                                         │
+│            Before      After      Savings               │
+│  Score      75/100  →  91/100   (+16 pts)               │
+│  Always-on  16,848  →   9,200   (-7,648 tokens/conv)   │
+│  Grade      B       →  A                                │
+│                                                         │
+│  PASS 9 → 13   WARN 3 → 1   FAIL 2 → 0                │
+└─────────────────────────────────────────────────────────┘
 ```
 
-Before 데이터는 `.claude/scratch/ctxcraft-before.json`에서 읽는다.
+Before data is read from `.claude/scratch/ctxcraft-before.json`.
 
 ## Cleanup After Optimization
 
