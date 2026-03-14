@@ -1,17 +1,17 @@
-# 토큰 효율 규칙
+# Token Efficiency Rules
 
-## 상시 로드 예산
-- CLAUDE.md + rules/ 합산 4,000 토큰 이하 유지 (~300줄)
-- rules/ 파일당 80줄 이하 — 초과분은 skills로 추출
-- CLAUDE.md는 매뉴얼이 아닌 인덱스로 작성
+## Always-on Budget
+- CLAUDE.md + rules/ combined must stay under 4,000 tokens (~300 lines)
+- Each rules/ file should be 80 lines or fewer — extract excess into skills
+- Write CLAUDE.md as an index, not a manual
 
-## 단계적 공개 (Progressive Disclosure)
-- Rules = 제약 조건 (해야 할 것/금지할 것) — 상시 로드, 짧게 유지
-- Skills = 지식 (하는 방법) — 온디맨드, 상세 가능
-- Agents = 실행 (대신 해줌) — 온디맨드, 포괄 가능
+## Progressive Disclosure
+- Rules = constraints (do / don't) — always loaded, keep short
+- Skills = knowledge (how to) — on-demand, can be detailed
+- Agents = execution (do it for me) — on-demand, can be comprehensive
 
-## 압축 기법
-- 산문보다 표: 설명 3줄 → 표 1행으로 변환
-- 문단보다 불릿 포인트
-- 말로 된 설명보다 코드 패턴
-- 중복보다 교차 참조: `> 참조: /skill-name`
+## Compression Techniques
+- Tables over prose: convert 3-line explanations → 1 table row
+- Bullet points over paragraphs
+- Code patterns over verbal descriptions
+- Cross-references over duplication: `> See: /skill-name`
