@@ -101,48 +101,48 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 ✅ 최적화 완료! ctxcraft 파일을 모두 정리했습니다.
 ```
 
-## 검증 항목
+## Checks
 
-### 토큰 효율 (1~8)
+### Token Efficiency (1–8)
 
-| # | 항목 | 기준 | 측정 내용 |
-|---|------|------|----------|
-| 1 | CLAUDE.md 크기 | 500줄 이하 | 매 대화 로드되는 핵심 파일 |
-| 2 | 상시 로드 토큰 | 8,000 이하 | CLAUDE.md + rules/ 총 토큰 |
-| 3 | Rules 파일 크기 | 100~130줄 | 개별 규칙 파일 적정 크기 |
-| 4 | Rules 파일 수 | 15개 이하 | 너무 많으면 통합 필요 |
-| 5 | 중복 섹션 | 0개 | CLAUDE.md ↔ rules/ 간 겹침 |
-| 6 | 단계적 공개 | 온디맨드 50%+ | 상시 vs 온디맨드 비율 |
-| 7 | Skills 파일 크기 | 250줄 이하 | 개별 스킬 적정 크기 |
-| 8 | 토큰 배분 비율 | 상시 30% 이하 | 전체 대비 상시 로드 비중 |
+| # | Check | Threshold | What it measures |
+|---|-------|-----------|------------------|
+| 1 | CLAUDE.md size | ≤ 500 lines | Core file loaded every conversation |
+| 2 | Always-on tokens | ≤ 8,000 | Total tokens from CLAUDE.md + rules/ |
+| 3 | Rules file size | 100–130 lines | Individual rule file size |
+| 4 | Rules file count | ≤ 15 | Too many → consolidate |
+| 5 | Duplicate sections | 0 | Overlap between CLAUDE.md ↔ rules/ |
+| 6 | Progressive disclosure | On-demand 50%+ | Always-on vs on-demand ratio |
+| 7 | Skills file size | ≤ 250 lines | Individual skill file size |
+| 8 | Token allocation ratio | Always-on ≤ 30% | Always-on share of total context |
 
-### 구조 유효성 (9~20)
+### Structural Validity (9–22)
 
-| # | 항목 | 기준 | 측정 내용 |
-|---|------|------|----------|
-| 9 | Agent Frontmatter | YAML `---` 블록 완전 | agent 파일 frontmatter 유효성 |
-| 10 | Agent 필수 필드 | name/description/tools | agent 필수 메타데이터 존재 여부 |
-| 11 | Skill Frontmatter | YAML `---` 블록 완전 | SKILL.md frontmatter 유효성 |
-| 12 | Skill References 링크 | 파일 실제 존재 | references/*.md 링크 유효성 |
-| 13 | Rules 스킬 참조 | `>` 참조 패턴 포함 | rules 하단 심화 skills 참조 여부 |
-| 14 | Rules 순수 Markdown | YAML frontmatter 없음 | rules는 frontmatter 불필요 |
-| 15 | Skills 고아 디렉토리 | SKILL.md 반드시 존재 | skills/xxx/ 있는데 SKILL.md 없으면 미작동 |
-| 16 | Rules 평면 구조 | 하위 디렉토리 없음 | rules/는 flat .md 파일만 허용 |
-| 17 | Agent Skills 참조 | skills/ 디렉토리 실존 | agent frontmatter skills 필드의 실존 여부 |
-| 18 | Agent Tools 최소권한 | reviewer/auditor/architect/planner에 Write/Edit 금지 | 분석 전용 에이전트 최소 권한 원칙 |
-| 19 | Rules 강제성 키워드 | MUST/SHOULD/NEVER 구조 | RFC 2119 스타일 규칙 작성 여부 |
-| 20 | CLAUDE.md ↔ Skills 동기화 | 언급된 skill 실존 | CLAUDE.md backtick 스킬명과 skills/ 디렉토리 일치 여부 |
-| 21 | 자동 학습 시스템 | lessons-learned + MEMORY + hooks/ | 반복 패턴을 rules로 승격 → 장기 토큰 절감 여부 |
-| 22 | Agent Model 명시 | model 필드 명시 | reviewer→opus, 단순 작업→haiku 지정으로 비용 최적화 여부 |
+| # | Check | Threshold | What it measures |
+|---|-------|-----------|------------------|
+| 9 | Agent frontmatter | Complete YAML `---` block | Agent file frontmatter validity |
+| 10 | Agent required fields | name/description/tools | Agent metadata presence |
+| 11 | Skill frontmatter | Complete YAML `---` block | SKILL.md frontmatter validity |
+| 12 | Skill references links | Files actually exist | references/*.md link validity |
+| 13 | Rules skill references | `>` reference pattern | Deep-dive skill links in rules |
+| 14 | Rules pure Markdown | No YAML frontmatter | Rules don't need frontmatter |
+| 15 | Skills orphan directories | SKILL.md must exist | skills/xxx/ without SKILL.md won't work |
+| 16 | Rules flat structure | No subdirectories | rules/ allows only flat .md files |
+| 17 | Agent skills references | skills/ directory exists | Agent frontmatter skills field validity |
+| 18 | Agent least privilege | No Write/Edit for reviewer/auditor/architect/planner | Read-only agents principle |
+| 19 | Rules enforcement keywords | MUST/SHOULD/NEVER | RFC 2119 style rule writing |
+| 20 | CLAUDE.md ↔ Skills sync | Referenced skills exist | Backtick skill names match skills/ directories |
+| 21 | Auto-learning system | memory + hooks + promotion | Pattern promotion to rules → long-term token savings |
+| 22 | Agent model specified | model field present | Cost optimization via model selection |
 
-## 점수 등급
+## Scoring
 
-| 등급 | 점수 | 의미 |
-|------|------|------|
-| A | 85+ | 훌륭합니다! |
-| B | 70~84 | 양호합니다 |
-| C | 50~69 | 개선이 필요합니다 |
-| D | 0~49 | 즉시 최적화를 권장합니다 |
+| Grade | Score | Meaning |
+|-------|-------|---------|
+| A | 85+ | Excellent |
+| B | 70–84 | Good |
+| C | 50–69 | Needs improvement |
+| D | 0–49 | Optimize immediately |
 
 ## `/optimize`가 하는 일
 
