@@ -106,39 +106,39 @@ Move always-loaded content to on-demand skills:
 > Deep dive: /compose-performance-audit
 ```
 
-### Strategy 6: Skills References 분리
+### Strategy 6: Extract Skills References
 
-SKILL.md가 250줄을 초과하면 상세 내용을 `references/` 하위 폴더로 분리:
+When a SKILL.md exceeds 250 lines, split verbose content into a `references/` subdirectory:
 
-**분리 대상:**
-- 긴 코드 예시와 템플릿
-- 심화 설명 및 Best Practice 목록
-- 설정 옵션 레퍼런스
+**What to extract:**
+- Long code examples and templates
+- Deep-dive explanations and Best Practice lists
+- Configuration option references
 
-**Action:** SKILL.md에 핵심 지시만 남기고, 상세 내용은 `references/*.md`로 이동 후 SKILL.md 하단에 참조 링크 추가.
+**Action:** Keep only the core instructions in SKILL.md, move detailed content to `references/*.md`, and add a reference link at the bottom of SKILL.md.
 
-**Before (skills/compose-navigation/SKILL.md — 258줄):**
+**Before (skills/compose-navigation/SKILL.md — 258 lines):**
 ```markdown
 ## Advanced Patterns
-[150줄의 상세 예시와 딥다이브 내용]
+[150 lines of detailed examples and deep-dive content]
 ```
 
-**After (skills/compose-navigation/SKILL.md — 80줄):**
+**After (skills/compose-navigation/SKILL.md — 80 lines):**
 ```markdown
 ## Advanced Patterns
-- 핵심 규칙 3줄 요약
-> 심화: references/navigation-advanced.md
+- 3-line summary of core rules
+> Deep dive: references/navigation-advanced.md
 ```
 
-**After (skills/compose-navigation/references/navigation-advanced.md — 180줄):**
+**After (skills/compose-navigation/references/navigation-advanced.md — 180 lines):**
 ```markdown
-# Navigation 심화 가이드
-[기존 상세 내용]
+# Navigation Deep Dive
+[original detailed content]
 ```
 
-**대상 조건:**
-- SKILL.md > 250줄이고
-- 분리 가능한 독립적 섹션이 존재할 때
+**When to apply:**
+- SKILL.md > 250 lines, AND
+- The file contains independently separable sections
 
 ### Strategy 5: Rule Consolidation
 
