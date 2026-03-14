@@ -41,23 +41,23 @@ When spawned, performs the analysis tasks below and returns a structured report.
 ## Output Format
 
 ```
-## Audit Results
+## 감사 결과
 
-### File Inventory
-| File | Lines | Category | Est. Tokens |
-|------|-------|----------|-------------|
-| ... | ... | always-on/on-demand | ... |
+### 파일 목록
+| 파일 | 줄 수 | 분류 | 추정 토큰 |
+|------|-------|------|----------|
+| ... | ... | 상시/온디맨드 | ... |
 
-### Totals: Always-on X tokens, On-demand Y tokens
+### 합계: 상시 로드 X 토큰, 온디맨드 Y 토큰
 
-### Duplicates Found
-1. [FileA] ↔ [FileB]: ~N lines overlap — [description]
+### 발견된 중복
+1. [파일A] ↔ [파일B]: ~N줄 겹침 — [설명]
 
-### Unused Files
-1. [File] — 0 references over N sessions
+### 미사용 파일
+1. [파일] — N세션 동안 참조 0회
 
-### Oversized Files
-1. [File] — N lines (threshold: M lines)
+### 과대 파일
+1. [파일] — N줄 (기준치: M줄)
 ```
 
 ## Rules
