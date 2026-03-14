@@ -37,18 +37,18 @@ CLAUDE.md is loaded EVERY conversation. Every line costs tokens.
 
 **Before:**
 ```markdown
-## ViewModel
-- We use @HiltViewModel annotation for all ViewModels
-- All ViewModels must extend BaseViewModel
-- We expose state using StateFlow
-- For events we use SharedFlow
-- Always use viewModelScope for coroutines
+## Error Handling
+- We use a custom Result wrapper for all API calls
+- All repositories must return Result<T> type
+- Errors should be mapped to domain-specific types
+- The UI layer observes error states reactively
+- Always log errors with structured metadata
 ```
 
 **After:**
 ```markdown
-## ViewModel
-`@HiltViewModel` + `BaseViewModel()` / `StateFlow`(state) + `SharedFlow`(event) / `viewModelScope`
+## Error Handling
+`Result<T>` wrapper for all API calls / domain-specific error mapping / reactive UI error states / structured logging
 ```
 
 ### Strategy 2: Deduplicate
@@ -83,27 +83,27 @@ Move always-loaded content to on-demand skills:
 
 **Should be in skills/ (on-demand):**
 - Detailed examples and templates
-- Framework-specific deep dives (Compose, Coroutines, etc.)
+- Framework-specific deep dives (React hooks, SwiftUI, Spring Boot, etc.)
 - Testing patterns
 - Migration guides
 - Reference material
 
 **Action:** Extract verbose sections from rules/ into new skills, leave a one-line reference.
 
-**Before (rules/compose.md — 120 lines always loaded):**
+**Before (rules/api-design.md — 120 lines always loaded):**
 ```markdown
-## Recomposition
-- Use @Stable/@Immutable annotations...
+## Error Responses
+- Use standard HTTP status codes for all endpoints...
 [60 lines of examples and explanations]
 ```
 
-**After (rules/compose.md — 20 lines always loaded):**
+**After (rules/api-design.md — 20 lines always loaded):**
 ```markdown
-## Recomposition
-- Use @Stable/@Immutable for custom types passed to Composables
-- Use derivedStateOf for frequently changing state
-- Use key() in LazyColumn/LazyRow
-> Deep dive: /compose-performance-audit
+## Error Responses
+- Use standard HTTP status codes (4xx client, 5xx server)
+- Return structured error body with code + message + details
+- Log server errors with correlation ID
+> Deep dive: /api-error-handling
 ```
 
 ### Strategy 6: Extract Skills References
@@ -117,22 +117,22 @@ When a SKILL.md exceeds 250 lines, split verbose content into a `references/` su
 
 **Action:** Keep only the core instructions in SKILL.md, move detailed content to `references/*.md`, and add a reference link at the bottom of SKILL.md.
 
-**Before (skills/compose-navigation/SKILL.md — 258 lines):**
+**Before (skills/state-management/SKILL.md — 258 lines):**
 ```markdown
 ## Advanced Patterns
 [150 lines of detailed examples and deep-dive content]
 ```
 
-**After (skills/compose-navigation/SKILL.md — 80 lines):**
+**After (skills/state-management/SKILL.md — 80 lines):**
 ```markdown
 ## Advanced Patterns
 - 3-line summary of core rules
-> Deep dive: references/navigation-advanced.md
+> Deep dive: references/state-advanced.md
 ```
 
-**After (skills/compose-navigation/references/navigation-advanced.md — 180 lines):**
+**After (skills/state-management/references/state-advanced.md — 180 lines):**
 ```markdown
-# Navigation Deep Dive
+# State Management Deep Dive
 [original detailed content]
 ```
 

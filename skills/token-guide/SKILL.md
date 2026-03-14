@@ -54,12 +54,12 @@ Loaded on-demand (only when triggered):
 ### Pattern 1: Thin Rules, Thick Skills
 
 ```
-rules/compose.md (always loaded — 15 lines):
+rules/error-handling.md (always loaded — 15 lines):
   - Key constraints only
   - One-liner per rule
-  - Reference: "> Deep dive: /compose-performance-audit"
+  - Reference: "> Deep dive: /error-handling-guide"
 
-skills/compose-performance-audit/SKILL.md (on-demand — 200 lines):
+skills/error-handling-guide/SKILL.md (on-demand — 200 lines):
   - Full examples
   - Anti-patterns with code
   - Detailed explanations
@@ -79,11 +79,11 @@ BAD (300 lines):
 GOOD (80 lines):
   ## Architecture
   Clean Architecture: app → domain/data/core
-  > Details: rules/architecture.md, /android-development
+  > Details: rules/architecture.md
 
   ## Patterns
-  ViewModel: @HiltViewModel + BaseViewModel + StateFlow/SharedFlow
-  > Details: rules/architecture.md, /hanssem-patterns
+  Service layer: dependency injection + repository pattern + reactive streams
+  > Details: rules/architecture.md, /project-patterns
 ```
 
 ### Pattern 3: Conditional Loading via Skills
@@ -91,7 +91,7 @@ GOOD (80 lines):
 Move content that's only relevant to specific tasks into skills:
 
 - Testing rules → `/tdd` skill
-- Migration guides → `/xml-to-compose-migration` skill
+- Migration guides → `/migration` skill
 - Release checklists → `/release` skill
 - Dependency management → `/dep-check` skill
 
