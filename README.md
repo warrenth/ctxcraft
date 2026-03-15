@@ -134,6 +134,7 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 | 20 | CLAUDE.md ↔ Skills sync | Referenced skills exist | Backtick skill names match skills/ directories |
 | 21 | Auto-learning system | memory + hooks + promotion | Pattern promotion to rules → long-term token savings |
 | 22 | Agent model specified | model field present | Cost optimization via model selection |
+| 23 | Context saving | scratch dir + save rules | Save large outputs outside conversation to reduce tokens |
 
 ## Scoring
 

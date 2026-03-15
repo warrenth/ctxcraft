@@ -798,6 +798,41 @@ else
 fi
 print_check 22 "${CHECK_NAMES[21]}" "${CHECK_STATUS[21]}" "${CHECK_DETAIL[21]}"
 
+# [23] Context Saving (scratch 디렉토리 + 대용량 출력 저장 규칙)
+
+# ① scratch/temp/tmp/workspace 디렉토리 존재?
+has_scratch=false
+{ find "$CLAUDE_DIR" -maxdepth 1 -type d 2>/dev/null | grep -qiE "scratch|temp|tmp|workspace"; } && has_scratch=true || true
+
+# ② rules/ 또는 CLAUDE.md에 대용량 출력 저장 관련 키워드?
+has_save_rule=false
+_save_targets=""
+[ -f "$ROOT_CLAUDE" ] && _save_targets="$ROOT_CLAUDE"
+if [ -d "$CLAUDE_DIR/rules" ]; then
+    _rule_files=$(find "$CLAUDE_DIR/rules" -name "*.md" 2>/dev/null || true)
+    [ -n "$_rule_files" ] && _save_targets="${_save_targets} ${_rule_files}"
+fi
+for _sf in $_save_targets; do
+    [ -f "$_sf" ] || continue
+    grep -qiE "scratch|save.*(output|log)|large.*(output|result)|임시.*저장|대용량.*저장|sub.?agent|서브.*에이전트" "$_sf" 2>/dev/null && { has_save_rule=true; break; }
+done
+
+# 점수 집계 — 없어도 패널티 없음(항상 PASS)
+ctx_score=0
+ctx_found=""
+ctx_missing=""
+[ "$has_scratch"   = true ] && { ctx_score=$((ctx_score + 1)); ctx_found="${ctx_found} ScratchDir✓"; }   || ctx_missing="${ctx_missing} ScratchDir"
+[ "$has_save_rule" = true ] && { ctx_score=$((ctx_score + 1)); ctx_found="${ctx_found} SaveRule✓"; }     || ctx_missing="${ctx_missing} SaveRule"
+
+if [ "$ctx_score" -eq 2 ]; then
+    add_result "Context Saving" "PASS" "구축됨 —${ctx_found} — 대용량 출력을 대화 밖에 저장하여 토큰 절감 활성화" 0
+elif [ "$ctx_score" -eq 1 ]; then
+    add_result "Context Saving" "PASS" "부분 구축됨 (${ctx_score}/2) —${ctx_found} / 미감지:${ctx_missing}" 0
+else
+    add_result "Context Saving" "PASS" "미구축 (선택사항) — scratch 디렉토리 + 저장 규칙 추가 시 대화당 50-200K 토큰 절감 가능" 0
+fi
+print_check 23 "${CHECK_NAMES[22]}" "${CHECK_STATUS[22]}" "${CHECK_DETAIL[22]}"
+
 # ─────────────────────────────────────────────
 # Phase 2: 리포트 요약
 # ─────────────────────────────────────────────
