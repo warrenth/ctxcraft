@@ -185,7 +185,8 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 
 | Grade | Score | Meaning |
 |-------|-------|---------|
-| A | 85+ | Excellent |
+| S | 95+ | Perfect — You are a Context Master! |
+| A | 85–94 | Excellent |
 | B | 70–84 | Good |
 | C | 50–69 | Needs improvement |
 | D | 0–49 | Optimize immediately |

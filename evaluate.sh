@@ -964,7 +964,11 @@ else
 fi
 
 # 등급
-if [ "$score_100" -ge 85 ]; then
+if [ "$score_100" -ge 95 ]; then
+    grade="S"
+    grade_color="$CYAN"
+    grade_msg="Perfect — You are a Context Master!"
+elif [ "$score_100" -ge 85 ]; then
     grade="A"
     grade_color="$GREEN"
     grade_msg="훌륭합니다!"
@@ -1121,6 +1125,9 @@ if [ "$score_100" -lt 85 ]; then
         echo -e "  ${DIM}건너뛰었습니다.${RESET}"
         echo -e "  나중에 다시: ${DIM}curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | bash${RESET}"
     fi
+elif [ "$score_100" -ge 95 ]; then
+    echo -e "  ${CYAN}${BOLD}🏆 Perfect — You are a Context Master!${RESET}"
+    echo -e "  ${DIM}당신의 .claude/ 구조는 토큰 효율의 정점입니다.${RESET}"
 else
     echo -e "  ${GREEN}✅ 이미 잘 최적화되어 있습니다!${RESET}"
 fi
