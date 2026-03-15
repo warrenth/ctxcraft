@@ -838,17 +838,25 @@ print_check 23 "${CHECK_NAMES[22]}" "${CHECK_STATUS[22]}" "${CHECK_DETAIL[22]}"
 # ─────────────────────────────────────────────
 echo -e "${CYAN}${BOLD}━━━ Phase 2: 리포트 ━━━${RESET}\n"
 
-# 점수 계산
+# 점수 계산 — "해당 없음" 항목은 점수 집계에서 제외
 total_score=0
-max_score=$((CHECK_IDX * 10))
+scored_count=0
 pass_count=0
 warn_count=0
 fail_count=0
+na_count=0
 saveable_tokens=0
 
 for i in $(seq 0 $((CHECK_IDX - 1))); do
-    total_score=$((total_score + $(score_for_status "${CHECK_STATUS[$i]}")))
     saveable_tokens=$((saveable_tokens + CHECK_TOKENS[$i]))
+    # "해당 없음" PASS는 점수 계산에서 제외
+    if [ "${CHECK_STATUS[$i]}" = "PASS" ] && echo "${CHECK_DETAIL[$i]}" | grep -q "해당 없음"; then
+        na_count=$((na_count + 1))
+        pass_count=$((pass_count + 1))
+        continue
+    fi
+    total_score=$((total_score + $(score_for_status "${CHECK_STATUS[$i]}")))
+    scored_count=$((scored_count + 1))
     case "${CHECK_STATUS[$i]}" in
         PASS) pass_count=$((pass_count + 1)) ;;
         WARN) warn_count=$((warn_count + 1)) ;;
@@ -856,7 +864,8 @@ for i in $(seq 0 $((CHECK_IDX - 1))); do
     esac
 done
 
-# 100점 환산
+# 100점 환산 (실제 평가된 항목만)
+max_score=$((scored_count * 10))
 if [ "$max_score" -gt 0 ]; then
     score_100=$((total_score * 100 / max_score))
 else
