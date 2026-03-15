@@ -22,7 +22,7 @@ AI 코딩 에이전트(Claude Code, Cursor, Windsurf)는 매 대화마다 컨텍
 /plugin marketplace add warrenth/ctxcraft
 
 # 2. 플러그인 설치
-/plugin install ctxcraft@ctxcraft
+/plugin install ctxcraft@tools
 
 # 3. 사용
 /ctxcraft:evaluate
@@ -44,7 +44,7 @@ AI 코딩 에이전트(Claude Code, Cursor, Windsurf)는 매 대화마다 컨텍
     }
   },
   "enabledPlugins": {
-    "ctxcraft@ctxcraft": true
+    "ctxcraft@tools": true
   }
 }
 ```
