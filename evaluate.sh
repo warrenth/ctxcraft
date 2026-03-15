@@ -800,9 +800,14 @@ print_check 22 "${CHECK_NAMES[21]}" "${CHECK_STATUS[21]}" "${CHECK_DETAIL[21]}"
 
 # [23] Context Saving (scratch 디렉토리 + 대용량 출력 저장 규칙)
 
-# ① scratch/temp/tmp/workspace 디렉토리 존재?
+# ① scratch/temp/tmp/workspace/output/work 등 임시 출력 디렉토리 존재?
 has_scratch=false
-{ find "$CLAUDE_DIR" -maxdepth 1 -type d 2>/dev/null | grep -qiE "scratch|temp|tmp|workspace"; } && has_scratch=true || true
+# .claude/ 하위 디렉토리 체크 (다양한 이름 허용)
+{ find "$CLAUDE_DIR" -maxdepth 1 -type d 2>/dev/null | grep -qiE "scratch|temp|tmp|workspace|output|work|build.?log|cache"; } && has_scratch=true || true
+# .gitignore에 scratch/temp 관련 패턴이 있으면 의도적 사용으로 간주
+if [ "$has_scratch" = false ] && [ -f ".gitignore" ]; then
+    grep -qiE "scratch|\.claude.*(temp|tmp|output|work)" ".gitignore" 2>/dev/null && has_scratch=true || true
+fi
 
 # ② rules/ 또는 CLAUDE.md에 대용량 출력 저장 관련 키워드?
 has_save_rule=false
@@ -814,7 +819,7 @@ if [ -d "$CLAUDE_DIR/rules" ]; then
 fi
 for _sf in $_save_targets; do
     [ -f "$_sf" ] || continue
-    grep -qiE "scratch|save.*(output|log)|large.*(output|result)|임시.*저장|대용량.*저장|sub.?agent|서브.*에이전트" "$_sf" 2>/dev/null && { has_save_rule=true; break; }
+    grep -qiE "scratch|save.*(output|log|result|file)|large.*(output|result)|redirect.*(output|file)|임시.*저장|대용량.*저장|파일.*저장|sub.?agent|서브.*에이전트|\.claude/scratch" "$_sf" 2>/dev/null && { has_save_rule=true; break; }
 done
 
 # 점수 집계
