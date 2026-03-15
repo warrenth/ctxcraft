@@ -817,7 +817,7 @@ for _sf in $_save_targets; do
     grep -qiE "scratch|save.*(output|log)|large.*(output|result)|임시.*저장|대용량.*저장|sub.?agent|서브.*에이전트" "$_sf" 2>/dev/null && { has_save_rule=true; break; }
 done
 
-# 점수 집계 — 없어도 패널티 없음(항상 PASS)
+# 점수 집계
 ctx_score=0
 ctx_found=""
 ctx_missing=""
@@ -827,9 +827,9 @@ ctx_missing=""
 if [ "$ctx_score" -eq 2 ]; then
     add_result "Context Saving" "PASS" "구축됨 —${ctx_found} — 대용량 출력을 대화 밖에 저장하여 토큰 절감 활성화" 0
 elif [ "$ctx_score" -eq 1 ]; then
-    add_result "Context Saving" "PASS" "부분 구축됨 (${ctx_score}/2) —${ctx_found} / 미감지:${ctx_missing}" 0
+    add_result "Context Saving" "WARN" "부분 구축됨 (${ctx_score}/2) —${ctx_found} / 미감지:${ctx_missing}" 0 "scratch 디렉토리 생성 + 대용량 출력 저장 규칙 추가"
 else
-    add_result "Context Saving" "PASS" "미구축 (선택사항) — scratch 디렉토리 + 저장 규칙 추가 시 대화당 50-200K 토큰 절감 가능" 0
+    add_result "Context Saving" "WARN" "미구축 — 빌드/테스트 출력이 대화에 누적되어 대화당 50-200K 토큰 낭비 가능" 0 "mkdir -p .claude/scratch + rules/에 대용량 출력 저장 규칙 추가"
 fi
 print_check 23 "${CHECK_NAMES[22]}" "${CHECK_STATUS[22]}" "${CHECK_DETAIL[22]}"
 
