@@ -59,6 +59,16 @@ Check for these problems (ordered by impact):
 - `CLAUDE.md` contains content that duplicates `rules/` files
 - Agents that duplicate skill functionality
 
+#### 🟡 Cost (model-weighted cost)
+- Agent model cost analysis: opus=5x, sonnet=1x, haiku=0.2x (base: sonnet)
+- More than 2 opus agents → suggest downgrading simple agents to sonnet/haiku
+- Agents without `model:` field → missing cost optimization opportunity
+
+#### 🔴 Cross-reference (broken links)
+- `/skill-name` references in rules/ and CLAUDE.md that don't have matching skills/ directory
+- `> See: /skill-name` or `> 심화: /skill-name` patterns pointing to non-existent skills
+- More than 3 broken references → FAIL
+
 #### 🟢 Info (optimization opportunities)
 - Skills that haven't been referenced recently (check learning-log if available)
 - Rules that are too granular (could be merged)

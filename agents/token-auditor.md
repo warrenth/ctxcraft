@@ -38,6 +38,17 @@ When spawned, performs the analysis tasks below and returns a structured report.
   - skills/*/SKILL.md > 150 lines
   - agents/*.md > 120 lines
 
+### 5. Agent Model Cost Analysis
+- Read `model:` field from each agent frontmatter
+- Calculate weighted cost: opus=5x, sonnet=1x, haiku=0.2x (base: sonnet)
+- Flag agents with opus that could use a lighter model
+- Report total weighted cost across all agents
+
+### 6. Cross-reference Validation
+- Extract `/skill-name` references from rules/*.md and CLAUDE.md
+- Check each reference has a matching `skills/{name}/` directory
+- Report broken references with source file and line
+
 ## Output Format
 
 ```
@@ -58,6 +69,15 @@ When spawned, performs the analysis tasks below and returns a structured report.
 
 ### 과대 파일
 1. [파일] — N줄 (기준치: M줄)
+
+### Agent 모델별 비용
+| Agent | Model | 토큰 | 가중 비용 |
+|-------|-------|------|----------|
+| ... | opus/sonnet/haiku | ... | ...w |
+| **합계** | | | **Xw** |
+
+### 깨진 참조 (Cross-reference)
+1. [소스파일] → /skill-name — skills/skill-name/ 없음
 ```
 
 ## Rules

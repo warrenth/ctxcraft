@@ -838,6 +838,92 @@ else
 fi
 print_check 23 "${CHECK_NAMES[22]}" "${CHECK_STATUS[22]}" "${CHECK_DETAIL[22]}"
 
+# [24] Agent 모델별 비용 분석
+# 모델별 상대 비용: opus=5x, sonnet=1x, haiku=0.2x (기준: sonnet=1)
+agent_model_opus=0
+agent_model_sonnet=0
+agent_model_haiku=0
+agent_model_none=0
+agent_cost_details=""
+total_weighted_cost=0
+if [ -d "$CLAUDE_DIR/agents" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        agent_base=$(basename "$f" .md)
+        model_val=$(grep "^model:" "$f" 2>/dev/null | head -1 | sed 's/^model:[[:space:]]*//' | tr -d ' ' || true)
+        lines=$(count_lines "$f")
+        est_tokens=$((lines * TOKENS_PER_LINE))
+        case "$model_val" in
+            opus)   agent_model_opus=$((agent_model_opus + 1));     cost=$((est_tokens * 5)); agent_cost_details="${agent_cost_details} ${agent_base}(opus,${est_tokens}tok→${cost}w)" ;;
+            sonnet) agent_model_sonnet=$((agent_model_sonnet + 1)); cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(sonnet,${est_tokens}tok→${cost}w)" ;;
+            haiku)  agent_model_haiku=$((agent_model_haiku + 1));   cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(haiku,${est_tokens}tok→${cost}w)" ;;  # 0.2x → 소수점 회피, 1로 처리
+            "")     agent_model_none=$((agent_model_none + 1));     cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(미지정,${est_tokens}tok→${cost}w)" ;;
+            *)      agent_model_sonnet=$((agent_model_sonnet + 1)); cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(${model_val},${est_tokens}tok→${cost}w)" ;;
+        esac
+        total_weighted_cost=$((total_weighted_cost + cost))
+    done < <(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null)
+fi
+if [ "$agents_count" -eq 0 ]; then
+    add_result "Agent 모델별 비용" "PASS" "agents 없음 (해당 없음)" 0
+elif [ "$agent_model_opus" -eq 0 ]; then
+    add_result "Agent 모델별 비용" "PASS" "opus 에이전트 없음 — 가중 비용: ~${total_weighted_cost}w (opus=${agent_model_opus} sonnet=${agent_model_sonnet} haiku=${agent_model_haiku} 미지정=${agent_model_none})" 0
+elif [ "$agent_model_opus" -le 2 ]; then
+    add_result "Agent 모델별 비용" "PASS" "opus ${agent_model_opus}개 — 가중 비용: ~${total_weighted_cost}w (opus=${agent_model_opus} sonnet=${agent_model_sonnet} haiku=${agent_model_haiku})" 0
+else
+    save_hint="opus ${agent_model_opus}개 → 단순 에이전트를 sonnet/haiku로 전환 시 비용 절감"
+    add_result "Agent 모델별 비용" "WARN" "opus ${agent_model_opus}개 과다 — 가중 비용: ~${total_weighted_cost}w" 0 "$save_hint"
+fi
+print_check 24 "${CHECK_NAMES[23]}" "${CHECK_STATUS[23]}" "${CHECK_DETAIL[23]}"
+
+# [25] Cross-reference 유효성 (rules/CLAUDE.md 내 /skill-name 참조가 실제 존재하는지)
+xref_broken=0
+xref_list=""
+xref_targets=""
+[ -f "$ROOT_CLAUDE" ] && xref_targets="$ROOT_CLAUDE"
+if [ -d "$CLAUDE_DIR/rules" ]; then
+    for f in "$CLAUDE_DIR/rules/"*.md; do
+        [ -f "$f" ] && xref_targets="${xref_targets} ${f}"
+    done
+fi
+if [ -n "$xref_targets" ] && [ -d "$CLAUDE_DIR/skills" ]; then
+    # 실제 존재하는 skill 이름 목록 수집 (비교용)
+    _all_skills=""
+    while IFS= read -r _sd; do
+        [ -d "$_sd" ] || continue
+        _all_skills="${_all_skills} $(basename "$_sd")"
+    done < <(find "$CLAUDE_DIR/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+
+    # /skill-name 참조 추출 — 슬래시 커맨드 패턴만 검사
+    # 1) 백틱으로 감싼 `/name` 패턴: `backtick`/name`
+    # 2) > 참조 라인: > 심화는 /name, > See: /name
+    # 3) 테이블 셀: | `/name` |
+    # 일반 경로(/java, /error 등)를 제외하기 위해 하이픈 포함 2단어 이상 또는 알려진 스킬만
+    for _xf in $xref_targets; do
+        [ -f "$_xf" ] || continue
+        while IFS= read -r ref_name; do
+            [ -z "$ref_name" ] && continue
+            # 이미 체크한 이름은 건너뛰기
+            echo "$xref_list" | grep -qw "$ref_name" && continue
+            # 이미 존재하는 스킬이면 건너뛰기 (PASS)
+            echo "$_all_skills" | grep -qw "$ref_name" && continue
+            # 하이픈 미포함 단일 단어는 일반 경로일 가능성 높음 → 스킵
+            echo "$ref_name" | grep -q "-" || continue
+            xref_broken=$((xref_broken + 1))
+            xref_list="${xref_list} ${ref_name}($(basename "$_xf"))"
+        done < <(grep -oE '`/[a-z][a-z0-9-]+`|> .*?/[a-z][a-z0-9-]+|\| `/[a-z][a-z0-9-]+`' "$_xf" 2>/dev/null | grep -oE '/[a-z][a-z0-9-]+' | sed 's|^/||' | sort -u || true)
+    done
+fi
+if [ -z "$xref_targets" ] || [ ! -d "$CLAUDE_DIR/skills" ]; then
+    add_result "Cross-reference 유효성" "PASS" "검증 대상 없음 (해당 없음)" 0
+elif [ "$xref_broken" -eq 0 ]; then
+    add_result "Cross-reference 유효성" "PASS" "rules/CLAUDE.md 내 모든 /skill-name 참조가 skills/에 존재" 0
+elif [ "$xref_broken" -le 3 ]; then
+    add_result "Cross-reference 유효성" "WARN" "존재하지 않는 skill 참조 ${xref_broken}개:${xref_list}" 0 "skills/ 디렉토리 생성 또는 참조 경로 수정"
+else
+    add_result "Cross-reference 유효성" "FAIL" "존재하지 않는 skill 참조 ${xref_broken}개:${xref_list}" 0 "참조 정리 필요 — 삭제된 skill이거나 오타"
+fi
+print_check 25 "${CHECK_NAMES[24]}" "${CHECK_STATUS[24]}" "${CHECK_DETAIL[24]}"
+
 # ─────────────────────────────────────────────
 # Phase 2: 리포트 요약
 # ─────────────────────────────────────────────
