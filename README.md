@@ -82,6 +82,15 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
   PASS  [14] Rules 순수 Markdown
   PASS  [15] Skills 고아 디렉토리
   PASS  [16] Rules 평면 구조
+  PASS  [17] Agent Skills 참조
+  PASS  [18] Agent Tools 최소권한
+  PASS  [19] Rules 강제성 키워드
+  PASS  [20] CLAUDE.md ↔ Skills 동기화
+  PASS  [21] 자동 학습 시스템
+  PASS  [22] Agent Model 명시
+  PASS  [23] Context Saving
+  PASS  [24] Agent 모델별 비용
+  PASS  [25] Cross-reference 유효성
 
 ━━━ Phase 2: 리포트 ━━━
 
@@ -105,8 +114,8 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
   💡 절감 가능: ~9168 토큰/대화
 
 ━━━ 최종 요약 ━━━
-  점수: 78/100 (B) — 양호합니다
-  PASS 11개  WARN 3개  FAIL 2개
+  점수: 86/100 (A) — 훌륭합니다!
+  PASS 20개  WARN 3개  FAIL 2개
 
 ━━━ Phase 3: 최적화 ━━━
 
@@ -129,7 +138,7 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 │  상시토큰  16,848  →   9,200   (-7,648 토큰/대화)        │
 │  등급      B       →  A                              │
 │                                                     │
-│  PASS 11개 → 15개   WARN 3개 → 1개   FAIL 2개 → 0개    │
+│  PASS 20개 → 24개   WARN 3개 → 1개   FAIL 2개 → 0개    │
 └─────────────────────────────────────────────────────┘
 
 ✅ 최적화 완료! ctxcraft 파일을 모두 정리했습니다.
@@ -150,7 +159,7 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 | 7 | Skills file size | ≤ 250 lines | Individual skill file size |
 | 8 | Token allocation ratio | Always-on ≤ 30% | Always-on share of total context |
 
-### Structural Validity (9–22)
+### Structural Validity (9–25)
 
 | # | Check | Threshold | What it measures |
 |---|-------|-----------|------------------|
@@ -169,6 +178,8 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 | 21 | Auto-learning system | memory + hooks + promotion | Pattern promotion to rules → long-term token savings |
 | 22 | Agent model specified | model field present | Cost optimization via model selection |
 | 23 | Context saving | scratch dir + save rules | Save large outputs outside conversation to reduce tokens |
+| 24 | Agent model cost | opus ≤ 2 agents | Weighted cost analysis: opus=5x, sonnet=1x, haiku=0.2x |
+| 25 | Cross-reference validity | All `/skill-name` refs exist | Broken skill references in rules/ and CLAUDE.md |
 
 ## Scoring
 
