@@ -1,0 +1,21 @@
+{
+  "name": "ctxcraft",
+  "owner": {
+    "name": "warrenth",
+    "email": ""
+  },
+  "metadata": {
+    "description": "AI agent context token efficiency evaluator & optimizer",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "ctxcraft",
+      "source": ".",
+      "description": "Evaluate and optimize .claude/ directory token efficiency",
+      "version": "1.0.0",
+      "category": "productivity",
+      "tags": ["token", "optimization", "context", "efficiency"]
+    }
+  ]
+}

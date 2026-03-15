@@ -1,0 +1,12 @@
+{
+  "name": "ctxcraft",
+  "description": "Evaluate and optimize .claude/ directory token efficiency. Reduce cost, improve response quality.",
+  "version": "1.0.0",
+  "author": {
+    "name": "warrenth"
+  },
+  "homepage": "https://github.com/warrenth/ctxcraft",
+  "repository": "https://github.com/warrenth/ctxcraft",
+  "license": "MIT",
+  "keywords": ["token", "optimization", "context", "efficiency", "claude-code"]
+}

@@ -15,7 +15,41 @@ AI 코딩 에이전트(Claude Code, Cursor, Windsurf)는 매 대화마다 컨텍
 
 ## 빠른 시작
 
-프로젝트 루트에서 한 줄로 실행:
+### 방법 1: Plugin Marketplace (권장)
+
+```bash
+# 1. 마켓플레이스 추가 (한 번만)
+/plugin marketplace add warrenth/ctxcraft
+
+# 2. 플러그인 설치
+/plugin install ctxcraft@ctxcraft
+
+# 3. 사용
+/ctxcraft:evaluate
+/ctxcraft:optimize
+```
+
+### 방법 2: 팀 자동 설치
+
+프로젝트 `.claude/settings.json`에 추가하면 팀원이 자동으로 설치됩니다:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "ctxcraft": {
+      "source": {
+        "source": "github",
+        "repo": "warrenth/ctxcraft"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "ctxcraft@ctxcraft": true
+  }
+}
+```
+
+### 방법 3: 원라인 스크립트
 
 ```bash
 curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
@@ -160,14 +194,19 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 
 ```
 ctxcraft/
-├── evaluate.sh                 # 원라인 평가 스크립트 (핵심)
-├── action.yml                  # GitHub Actions 통합
+├── .claude-plugin/
+│   ├── plugin.json             # 플러그인 매니페스트
+│   └── marketplace.json        # 마켓플레이스 카탈로그
+├── evaluate.sh                 # 원라인 평가 스크립트
 ├── skills/
-│   ├── evaluate/SKILL.md       # /evaluate 명령어
-│   ├── optimize/SKILL.md       # /optimize 명령어
+│   ├── evaluate/SKILL.md       # /ctxcraft:evaluate 명령어
+│   ├── optimize/SKILL.md       # /ctxcraft:optimize 명령어
 │   └── token-guide/SKILL.md    # 토큰 효율 레퍼런스
 ├── agents/
 │   └── token-auditor.md        # 전용 분석 에이전트
+├── rules/
+│   └── token-efficiency.md     # 토큰 효율 규칙
+├── action.yml                  # GitHub Actions 통합
 └── examples/
     └── ctxcraft-check.yml      # GitHub Actions 워크플로우 예시
 ```
