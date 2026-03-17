@@ -1,175 +1,139 @@
 # ctxcraft
 
-> AI 에이전트 컨텍스트를 평가하고 최적화하세요. 토큰을 아끼고, 비용을 줄이세요.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-Plugin-orange)](https://github.com/warrenth/ctxcraft)
 
-**ctxcraft**는 `.claude/` 디렉토리 구조를 분석하여 기능 손실 없이 토큰 소비를 줄이는 구체적인 개선안을 제시합니다.
+> Evaluate and optimize your AI agent's context. Save tokens, cut costs.
 
-## 문제
+**ctxcraft** analyzes your `.claude/` directory structure and provides actionable recommendations to reduce token consumption — without losing any functionality.
 
-AI 코딩 에이전트(Claude Code, Cursor, Windsurf)는 매 대화마다 컨텍스트 파일을 로드합니다. `.claude/` 디렉토리가 커질수록 다음과 같은 토큰 낭비가 조용히 발생합니다:
+## The Problem
 
-- 절반으로 줄일 수 있는 장황한 규칙 파일
-- rules, skills, CLAUDE.md 간 중복 콘텐츠
-- 한 번도 호출되지 않는 미사용 skills/agents
-- 온디맨드로 전환 가능한 상시 로드 파일
+AI coding agents (Claude Code, Cursor, Windsurf) load context files on every conversation. As your `.claude/` directory grows, **silent token waste** accumulates:
 
-## 빠른 시작
+- Verbose rule files that could be cut in half
+- Duplicated content across rules, skills, and CLAUDE.md
+- Unused skills/agents that are never invoked
+- Always-on files that should be loaded on-demand
 
-### 방법 1: Plugin Marketplace (권장)
+**ctxcraft finds and fixes all of this.**
 
-Claude Code 플러그인 시스템으로 설치합니다. 업데이트 자동 관리, 활성화/비활성화가 가능합니다.
+## Quick Start
 
-**터미널에서 설치:**
+### Option 1: Plugin Marketplace (Recommended)
 
 ```bash
-# 1. 마켓플레이스 추가 (한 번만)
+# Add marketplace (one-time)
 claude plugin marketplace add warrenth/ctxcraft
 
-# 2. 플러그인 설치
+# Install plugin
 claude plugin install ctxcraft@tools
 ```
 
-**Claude Code에서 실행:**
+Then in Claude Code:
 
 ```
-/ctxcraft:evaluate
-/ctxcraft:optimize
-/ctxcraft:token-guide
+/ctxcraft:evaluate    # Analyze token efficiency
+/ctxcraft:optimize    # Auto-fix issues
+/ctxcraft:token-guide # Best practices reference
 ```
 
-> **팀 자동 설치**: 프로젝트 `.claude/settings.json`에 추가하면 팀원이 자동으로 설치됩니다:
->
-> ```json
-> {
->   "extraKnownMarketplaces": {
->     "ctxcraft": {
->       "source": { "source": "github", "repo": "warrenth/ctxcraft" }
->     }
->   },
->   "enabledPlugins": { "ctxcraft@tools": true }
-> }
-> ```
+<details>
+<summary>Team auto-install via settings.json</summary>
 
-### 방법 2: 글로벌 설치 (기본)
+```json
+{
+  "extraKnownMarketplaces": {
+    "ctxcraft": {
+      "source": { "source": "github", "repo": "warrenth/ctxcraft" }
+    }
+  },
+  "enabledPlugins": { "ctxcraft@tools": true }
+}
+```
 
-플러그인 시스템 없이 `~/.claude/`에 직접 설치합니다. 모든 프로젝트에서 사용할 수 있습니다.
+</details>
 
-**터미널에서 설치:**
+### Option 2: Global Install
 
 ```bash
 curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash
 ```
 
-**Claude Code에서 실행:**
+Then in Claude Code: `/evaluate`, `/optimize`, `/token-guide`
 
-```
-/evaluate
-/optimize
-/token-guide
-```
+<details>
+<summary>Project-local install</summary>
 
-> **프로젝트 로컬 설치**: 특정 프로젝트의 `.claude/`에만 설치하려면 `--local` 플래그를 사용하세요. git commit 시 팀원도 공유 가능합니다.
->
-> ```bash
-> curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash -s -- --local
-> ```
-
-## 권한 프롬프트 없이 실행하기
-
-ctxcraft는 파일 읽기(Read, Grep, Glob) 도구만 사용하므로, Claude Code의 기본 권한 모드에서 **권한 프롬프트 없이** 바로 실행됩니다.
-
-> 만약 권한을 계속 물어본다면, Claude Code 실행 시 `--allowedTools` 옵션을 확인하세요.
-> Read, Grep, Glob은 기본 허용 도구입니다.
-
-## 동작 방식
-
-```
-$ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
-
-━━━ Phase 1: 토큰 효율 검증 ━━━
-
-  ✓ 스캔 완료 (파일 60개)
-
-  PASS  [ 1] CLAUDE.md 크기
-  FAIL  [ 2] 상시 로드 토큰
-  FAIL  [ 3] Rules 파일 크기
-  PASS  [ 4] Rules 파일 수
-  WARN  [ 5] 중복 섹션
-  PASS  [ 6] 단계적 공개
-  WARN  [ 7] Skills 파일 크기
-  PASS  [ 8] 토큰 배분 비율
-  PASS  [ 9] Agent Frontmatter
-  PASS  [10] Agent 필수 필드
-  PASS  [11] Skill Frontmatter
-  PASS  [12] Skill References 링크
-  WARN  [13] Rules 스킬 참조
-  PASS  [14] Rules 순수 Markdown
-  PASS  [15] Skills 고아 디렉토리
-  PASS  [16] Rules 평면 구조
-  PASS  [17] Agent Skills 참조
-  PASS  [18] Agent Tools 최소권한
-  PASS  [19] Rules 강제성 키워드
-  PASS  [20] CLAUDE.md ↔ Skills 동기화
-  PASS  [21] 자동 학습 시스템
-  PASS  [22] Agent Model 명시
-  PASS  [23] Context Saving
-  PASS  [24] Agent 모델별 비용
-  PASS  [25] Cross-reference 유효성
-
-━━━ Phase 2: 리포트 ━━━
-
-  📊 토큰 분석
-  ┌────────────────────┬──────────────┬───────────┐
-  │ 구분                │ 토큰         │ 파일 수   │
-  ├────────────────────┼──────────────┼───────────┤
-  │ 상시 로드 (매 대화)    │      16848   │    14     │
-  │ 온디맨드 (필요 시)     │      53040   │    46     │
-  ├────────────────────┼──────────────┼───────────┤
-  │ 합계                │      69888   │    60     │
-  └────────────────────┴──────────────┴───────────┘
-
-  📋 개선 필요 항목
-  FAIL  [ 2] 상시 로드 토큰        → rules 전체 압축 필요, 절감 가능: ~8848 토큰
-  FAIL  [ 3] Rules 파일 크기       → coroutines.md — 예시/설명 제거 또는 skills로 이동
-  WARN  [ 5] 중복 섹션             → 한 곳만 남기고 나머지 섹션 제거
-  WARN  [ 7] Skills 파일 크기      → compose-navigation — 상세 내용을 references/ 하위 폴더로 분리
-  WARN  [13] Rules 스킬 참조       → ai-behavior.md — 하단에 '> 심화: /skill-name' 한 줄 추가
-
-  💡 절감 가능: ~9168 토큰/대화
-
-━━━ 최종 요약 ━━━
-  품질: 86/100 (A) — 훌륭합니다!
-  비용: 여유 (Max 5x 기준)
-  PASS 20개  WARN 3개  FAIL 2개
-
-━━━ Phase 3: 최적화 ━━━
-
-  지금 최적화하시겠습니까? (y/n): y
-
-  ✓ 설치 완료
-  ✓ Claude Code 감지 — 최적화를 시작합니다.
+```bash
+curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash -s -- --local
 ```
 
-## 최적화 결과 (Before/After)
+</details>
 
-최적화 완료 후 자동으로 비교 리포트를 출력합니다:
+> ctxcraft uses only read-only tools (Read, Grep, Glob) — **no permission prompts** needed.
+
+## How It Works
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  ctxcraft — 최적화 완료                                │
-│                                                     │
-│              Before      After      Change          │
-│  품질         78/100  →  92/100   (+14 pts)          │
-│  비용         보통    →  여유                         │
-│  Always-on   16,848  →   9,200   (-7,648 토큰/대화)   │
-│                                                     │
-│  PASS 20개 → 24개   WARN 3개 → 1개   FAIL 2개 → 0개    │
-└─────────────────────────────────────────────────────┘
+$ /ctxcraft:evaluate
 
-✅ 최적화 완료! ctxcraft 파일을 모두 정리했습니다.
+━━━ Phase 1: Token Efficiency Audit ━━━
+
+  PASS  [ 1] CLAUDE.md size
+  FAIL  [ 2] Always-on tokens         → Compress rules, save ~8,848 tokens
+  FAIL  [ 3] Rules file size           → Move examples to skills/
+  PASS  [ 4] Rules file count
+  WARN  [ 5] Duplicate sections        → Keep in one place only
+  PASS  [ 6] Progressive disclosure
+  ...
+  PASS  [25] Cross-reference validity
+
+━━━ Phase 2: Report ━━━
+
+  ┌────────────────────┬────────────┬───────┐
+  │ Category           │ Tokens     │ Files │
+  ├────────────────────┼────────────┼───────┤
+  │ Always-on (every)  │    16,848  │   14  │
+  │ On-demand (lazy)   │    53,040  │   46  │
+  ├────────────────────┼────────────┼───────┤
+  │ Total              │    69,888  │   60  │
+  └────────────────────┴────────────┴───────┘
+
+  💡 Potential savings: ~9,168 tokens/conversation
+
+━━━ Summary ━━━
+  Quality: 86/100 (A)
+  Cost: Comfortable (Max 5x plan)
+  PASS 20  WARN 3  FAIL 2
 ```
 
-## Checks
+## Before / After
+
+```
+┌──────────────────────────────────────────────────┐
+│  ctxcraft — Optimization Complete                │
+│                                                  │
+│              Before      After       Change      │
+│  Quality     78/100  →  92/100    (+14 pts)      │
+│  Always-on   16,848  →   9,200   (-7,648 tok)   │
+│                                                  │
+│  PASS 20 → 24   WARN 3 → 1   FAIL 2 → 0        │
+└──────────────────────────────────────────────────┘
+```
+
+## What `/optimize` Does
+
+1. **Compress** — Shrink verbose rules and CLAUDE.md while preserving meaning
+2. **Deduplicate** — Merge overlapping rules into a single source of truth
+3. **Clean up** — Identify and remove unused skills/agents
+4. **Restructure** — Move always-on content to on-demand skills
+5. **Split references** — Extract details from large SKILL.md (>250 lines) into references/
+6. **Self-clean** — Remove ctxcraft files after optimization
+
+All changes require user confirmation before applying.
+
+## 25 Checks
 
 ### Token Efficiency (1–8)
 
@@ -177,42 +141,43 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 |---|-------|-----------|------------------|
 | 1 | CLAUDE.md size | ≤ 500 lines | Core file loaded every conversation |
 | 2 | Always-on tokens | ≤ 8,000 | Total tokens from CLAUDE.md + rules/ |
-| 3 | Rules file size | 100–130 lines | Individual rule file size |
-| 4 | Rules file count | ≤ 15 | Too many → consolidate |
+| 3 | Rules file size | 100–130 lines | Individual rule file bloat |
+| 4 | Rules file count | ≤ 15 | Too many rules → consolidate |
 | 5 | Duplicate sections | 0 | Overlap between CLAUDE.md ↔ rules/ |
 | 6 | Progressive disclosure | On-demand 50%+ | Always-on vs on-demand ratio |
-| 7 | Skills file size | ≤ 250 lines | Individual skill file size |
+| 7 | Skills file size | ≤ 250 lines | Individual skill file bloat |
 | 8 | Token allocation ratio | Always-on ≤ 30% | Always-on share of total context |
 
-### Structural Validity (9–25)
+<details>
+<summary>Structural Validity (9–25)</summary>
 
-| # | Check | Threshold | What it measures |
-|---|-------|-----------|------------------|
-| 9 | Agent frontmatter | Complete YAML `---` block | Agent file frontmatter validity |
-| 10 | Agent required fields | name/description/tools | Agent metadata presence |
-| 11 | Skill frontmatter | Complete YAML `---` block | SKILL.md frontmatter validity |
-| 12 | Skill references links | Files actually exist | references/*.md link validity |
-| 13 | Rules skill references | `>` reference pattern | Deep-dive skill links in rules |
-| 14 | Rules pure Markdown | No YAML frontmatter | Rules don't need frontmatter |
-| 15 | Skills orphan directories | SKILL.md must exist | skills/xxx/ without SKILL.md won't work |
-| 16 | Rules flat structure | No subdirectories | rules/ allows only flat .md files |
-| 17 | Agent skills references | skills/ directory exists | Agent frontmatter skills field validity |
-| 18 | Agent least privilege | No Write/Edit for reviewer/auditor/architect/planner | Read-only agents principle |
-| 19 | Rules enforcement keywords | MUST/SHOULD/NEVER | RFC 2119 style rule writing |
-| 20 | CLAUDE.md ↔ Skills sync | Referenced skills exist | Backtick skill names match skills/ directories |
-| 21 | Auto-learning system | memory + hooks + promotion | Pattern promotion to rules → long-term token savings |
-| 22 | Agent model specified | model field present | Cost optimization via model selection |
-| 23 | Context saving | scratch dir + save rules | Save large outputs outside conversation to reduce tokens |
-| 24 | Agent model cost | opus ≤ 2 agents | Weighted cost analysis: opus=5x, sonnet=1x, haiku=0.2x |
-| 25 | Cross-reference validity | All `/skill-name` refs exist | Broken skill references in rules/ and CLAUDE.md |
+| # | Check | What it measures |
+|---|-------|------------------|
+| 9 | Agent frontmatter | YAML `---` block validity |
+| 10 | Agent required fields | name/description/tools presence |
+| 11 | Skill frontmatter | YAML `---` block validity |
+| 12 | Skill references links | references/*.md link validity |
+| 13 | Rules skill references | Deep-dive `/skill-name` links |
+| 14 | Rules pure Markdown | No YAML frontmatter in rules |
+| 15 | Skills orphan directories | SKILL.md must exist in each dir |
+| 16 | Rules flat structure | No subdirectories allowed |
+| 17 | Agent skills references | skills/ directory exists |
+| 18 | Agent least privilege | Read-only agents don't get Write/Edit |
+| 19 | Rules enforcement keywords | MUST/SHOULD/NEVER (RFC 2119) |
+| 20 | CLAUDE.md ↔ Skills sync | Referenced skills actually exist |
+| 21 | Auto-learning system | memory + hooks + promotion pipeline |
+| 22 | Agent model specified | Model field for cost control |
+| 23 | Context saving | scratch dir + save rules |
+| 24 | Agent model cost | opus ≤ 2 agents (weighted cost) |
+| 25 | Cross-reference validity | No broken `/skill-name` references |
 
-## Scoring — 2-Axis System
+</details>
 
-ctxcraft separates **quality** (structural health) from **cost** (token budget). Quality is universal; cost depends on your plan.
+## Scoring
 
-### Quality Score (all plans)
+ctxcraft uses a **2-axis system** — quality (universal) and cost (plan-dependent).
 
-Measures adherence risk — duplicates, broken references, structure issues.
+**Quality** measures structural health:
 
 ```
 Quality = 100 - (FAIL × 3) - (WARN × 1)
@@ -220,76 +185,55 @@ Quality = 100 - (FAIL × 3) - (WARN × 1)
 
 | Grade | Score | Meaning |
 |-------|-------|---------|
-| S | 95+ | Perfect — You are a Context Master! |
+| S | 95+ | Context Master |
 | A | 85–94 | Excellent |
 | B | 70–84 | Good |
-| C | 50–69 | Needs improvement |
-| D | 0–49 | Optimize immediately |
+| C | 50–69 | Needs work |
+| D | 0–49 | Optimize now |
 
-### Cost Impact (per plan tier)
+**Cost** shows token budget usage per plan:
 
-Shows how much of your plan's context budget is consumed. Informational, not scored.
+| Plan | Comfortable | Warning | Critical |
+|------|-------------|---------|----------|
+| Pro | < 15K | 15K–25K | > 25K |
+| Max 5x | < 20K | 20K–35K | > 35K |
+| Max 20x | < 25K | 25K–40K | > 40K |
+| Team | < 20K | 20K–35K | > 35K |
+| Opus 1M | < 50K | 50K–80K | > 80K |
 
-| Plan | Context | Comfortable | Warning | Critical |
-|------|---------|-------------|---------|----------|
-| Pro | 200K | < 15K tokens | 15K–25K | > 25K |
-| Max 5x | 200K | < 20K tokens | 20K–35K | > 35K |
-| Max 20x | 200K | < 25K tokens | 25K–40K | > 40K |
-| Team | 200K | < 20K tokens | 20K–35K | > 35K |
-| Opus 1M | 1M | < 50K tokens | 50K–80K | > 80K |
+> On-demand skills/agents are NOT penalized — they load only when needed.
 
-```
-┌─────────────────────────────────────┐
-│  품질: 86/100 (A)    ← universal   │
-│  비용: 여유           ← per plan   │
-└─────────────────────────────────────┘
-```
-
-> On-demand skills/agents are NOT penalized for being "unused" — they are designed to load only when needed.
-
-## `/optimize`가 하는 일
-
-1. **압축** — 의미를 유지하면서 장황한 rules와 CLAUDE.md 축소
-2. **중복 제거** — 겹치는 규칙을 단일 소스로 병합
-3. **정리** — 미사용 skills/agents 식별 및 제거
-4. **재구조화** — 상시 로드 콘텐츠를 온디맨드 skills로 이동
-5. **references 분리** — SKILL.md 250줄 초과 시 상세 내용을 references/로 이동
-6. **자동 삭제** — 최적화 완료 후 ctxcraft 파일 자동 정리
-
-모든 변경은 적용 전 사용자 확인을 거칩니다.
-
-## 프로젝트 구조
+## Project Structure
 
 ```
 ctxcraft/
 ├── .claude-plugin/
-│   ├── plugin.json             # 플러그인 매니페스트
-│   └── marketplace.json        # 마켓플레이스 카탈로그
-├── evaluate.sh                 # 원라인 평가 스크립트
+│   ├── plugin.json           # Plugin manifest
+│   └── marketplace.json      # Marketplace catalog
 ├── skills/
-│   ├── evaluate/SKILL.md       # /ctxcraft:evaluate 명령어
-│   ├── optimize/SKILL.md       # /ctxcraft:optimize 명령어
-│   └── token-guide/SKILL.md    # 토큰 효율 레퍼런스
+│   ├── evaluate/SKILL.md     # /ctxcraft:evaluate
+│   ├── optimize/SKILL.md     # /ctxcraft:optimize
+│   └── token-guide/SKILL.md  # Token efficiency reference
 ├── agents/
-│   └── token-auditor.md        # 전용 분석 에이전트
+│   └── token-auditor.md      # Dedicated analysis agent
 ├── rules/
-│   └── token-efficiency.md     # 토큰 효율 규칙
-├── action.yml                  # GitHub Actions 통합
-└── examples/
-    └── ctxcraft-check.yml      # GitHub Actions 워크플로우 예시
+│   └── token-efficiency.md   # Token efficiency rules
+├── action.yml                # GitHub Actions integration
+├── evaluate.sh               # One-liner evaluation script
+└── install.sh                # Global/local installer
 ```
 
-## 지원 환경
+## Supported Environments
 
 - [x] Claude Code
-- [ ] Cursor (예정)
-- [ ] Windsurf (예정)
-- [ ] Cline (예정)
+- [ ] Cursor (planned)
+- [ ] Windsurf (planned)
+- [ ] Cline (planned)
 
-## 기여
+## Contributing
 
-기여를 환영합니다!
+Contributions are welcome! Feel free to open issues and pull requests.
 
-## 라이선스
+## License
 
 MIT
