@@ -3,7 +3,7 @@ name: evaluate
 description: Evaluate .claude/ directory token efficiency and generate a score report
 user_invocable: true
 command: /evaluate
-tools: [Read, Grep, Glob, Bash, Agent]
+tools: [Read, Grep, Glob, Agent]
 ---
 
 # Token Efficiency Evaluation
@@ -37,7 +37,7 @@ Also check the project root for `CLAUDE.md` — this is always loaded.
 
 For each file, estimate tokens:
 - **Rule of thumb**: 1 line ≈ 10-15 tokens (avg for markdown with code)
-- Count total lines per file using `wc -l` or Read tool
+- Count total lines per file using the Read tool (do NOT use Bash `wc -l`)
 - Categorize as:
   - **Always-loaded**: `CLAUDE.md` (root + .claude/), `rules/*.md` — loaded EVERY conversation
   - **On-demand**: `skills/`, `agents/` — loaded only when triggered

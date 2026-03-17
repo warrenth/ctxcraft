@@ -3,7 +3,7 @@ name: optimize
 description: Apply token optimization improvements based on evaluation results
 user_invocable: true
 command: /optimize
-tools: [Read, Write, Edit, Grep, Glob, Bash, Agent]
+tools: [Read, Write, Edit, Grep, Glob, Agent]
 ---
 
 # Token Optimization

@@ -19,16 +19,22 @@ AI 코딩 에이전트(Claude Code, Cursor, Windsurf)는 매 대화마다 컨텍
 
 Claude Code 플러그인 시스템으로 설치합니다. 업데이트 자동 관리, 활성화/비활성화가 가능합니다.
 
+**터미널에서 설치:**
+
 ```bash
 # 1. 마켓플레이스 추가 (한 번만)
 claude plugin marketplace add warrenth/ctxcraft
 
 # 2. 플러그인 설치
 claude plugin install ctxcraft@tools
+```
 
-# 3. Claude Code에서 사용
+**Claude Code에서 실행:**
+
+```
 /ctxcraft:evaluate
 /ctxcraft:optimize
+/ctxcraft:token-guide
 ```
 
 > **팀 자동 설치**: 프로젝트 `.claude/settings.json`에 추가하면 팀원이 자동으로 설치됩니다:
@@ -46,10 +52,20 @@ claude plugin install ctxcraft@tools
 
 ### 방법 2: 글로벌 설치 (기본)
 
-플러그인 시스템 없이 `~/.claude/`에 직접 설치합니다. 모든 프로젝트에서 `/evaluate`, `/optimize`를 사용할 수 있습니다.
+플러그인 시스템 없이 `~/.claude/`에 직접 설치합니다. 모든 프로젝트에서 사용할 수 있습니다.
+
+**터미널에서 설치:**
 
 ```bash
 curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash
+```
+
+**Claude Code에서 실행:**
+
+```
+/evaluate
+/optimize
+/token-guide
 ```
 
 > **프로젝트 로컬 설치**: 특정 프로젝트의 `.claude/`에만 설치하려면 `--local` 플래그를 사용하세요. git commit 시 팀원도 공유 가능합니다.
@@ -57,6 +73,13 @@ curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | b
 > ```bash
 > curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash -s -- --local
 > ```
+
+## 권한 프롬프트 없이 실행하기
+
+ctxcraft는 파일 읽기(Read, Grep, Glob) 도구만 사용하므로, Claude Code의 기본 권한 모드에서 **권한 프롬프트 없이** 바로 실행됩니다.
+
+> 만약 권한을 계속 물어본다면, Claude Code 실행 시 `--allowedTools` 옵션을 확인하세요.
+> Read, Grep, Glob은 기본 허용 도구입니다.
 
 ## 동작 방식
 

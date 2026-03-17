@@ -2,7 +2,7 @@
 name: token-auditor
 description: Specialized agent that analyzes token waste and duplication in .claude/ directories
 model: sonnet
-tools: [Read, Grep, Glob, Bash]
+tools: [Read, Grep, Glob]
 ---
 
 # Token Auditor Agent
