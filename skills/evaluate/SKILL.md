@@ -74,18 +74,53 @@ Check for these problems (ordered by impact):
 - Rules that are too granular (could be merged)
 - Missing progressive disclosure (everything in rules, nothing in skills)
 
-### Step 4: Calculate Score
+### Step 4: Run 25-Point Checklist and Calculate Score
 
-```
-Score = 100 - penalties
+Run ALL 25 checks below. Each check results in PASS (0), WARN (-1), or FAIL (-3).
 
-Penalties:
-- Always-loaded > 3000 tokens:  -2 per extra 100 tokens (max -30)
-- Each duplicate section found:  -5 (max -25)
-- Each unused skill/agent:       -2 (max -20)
-- No progressive disclosure:     -15
-- Poor structure/naming:         -10
+**Token Efficiency (1–8)**
+
+| # | Check | PASS | WARN | FAIL |
+|---|-------|------|------|------|
+| 1 | CLAUDE.md size | ≤ 200 lines | 201–500 | > 500 |
+| 2 | Always-on tokens (CLAUDE.md + rules/) | ≤ 8,000 | 8,001–12,000 | > 12,000 |
+| 3 | Rules file size (individual) | all ≤ 100 lines | any 101–130 | any > 130 |
+| 4 | Rules file count | ≤ 15 | 16–20 | > 20 |
+| 5 | Duplicate sections (CLAUDE.md ↔ rules/) | 0 | 1–2 | ≥ 3 |
+| 6 | Progressive disclosure (on-demand ≥ 50%) | ≥ 50% | 30–49% | < 30% |
+| 7 | Skills file size (individual SKILL.md) | all ≤ 150 lines | any 151–250 | any > 250 |
+| 8 | Token allocation (always-on ≤ 30% of total) | ≤ 30% | 31–50% | > 50% |
+
+**Structural Validity (9–25)**
+
+| # | Check | PASS | WARN | FAIL |
+|---|-------|------|------|------|
+| 9 | Agent frontmatter (valid YAML `---` block) | all valid | — | any invalid |
+| 10 | Agent required fields (name/description/tools) | all present | — | any missing |
+| 11 | Skill frontmatter (valid YAML `---` block) | all valid | — | any invalid |
+| 12 | Skill references links (files exist) | all exist | — | any missing |
+| 13 | Rules skill references (`> 심화` pattern) | all rules have ref | most have | < 50% have |
+| 14 | Rules pure Markdown (no YAML frontmatter) | none have frontmatter | — | any have |
+| 15 | Skills orphan directories (SKILL.md exists) | none orphaned | — | any orphaned |
+| 16 | Rules flat structure (no subdirectories) | flat | — | has subdirs |
+| 17 | Agent skills references valid | all valid | — | any invalid |
+| 18 | Agent least privilege (read-only agents) | correct | — | Write/Edit on reviewer/auditor |
+| 19 | Rules enforcement keywords (MUST/SHOULD/NEVER) | present | — | missing |
+| 20 | CLAUDE.md ↔ Skills sync | all referenced skills exist | — | any missing |
+| 21 | Auto-learning system (hooks + promotion) | present | partial | missing |
+| 22 | Agent model specified | all specified | — | any missing |
+| 23 | Context saving (scratch dir + save rules) | present | partial | missing |
+| 24 | Agent model cost (opus ≤ 2) | ≤ 2 opus | 3 opus | > 3 opus |
+| 25 | Cross-reference validity | all valid | — | any broken |
+
+**Score calculation:**
 ```
+Score = 100 - (FAIL_count × 3) - (WARN_count × 1)
+
+Grades: S (95+), A (85–94), B (70–84), C (50–69), D (0–49)
+```
+
+**IMPORTANT**: Do NOT penalize on-demand skills/agents for being "unused" — they are designed to be loaded only when needed. Only penalize always-loaded files.
 
 ### Step 5: Generate Report
 

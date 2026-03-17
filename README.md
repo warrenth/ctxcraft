@@ -207,6 +207,10 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 
 ## Scoring
 
+```
+Score = 100 - (FAIL × 3) - (WARN × 1)
+```
+
 | Grade | Score | Meaning |
 |-------|-------|---------|
 | S | 95+ | Perfect — You are a Context Master! |
@@ -214,6 +218,8 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 | B | 70–84 | Good |
 | C | 50–69 | Needs improvement |
 | D | 0–49 | Optimize immediately |
+
+> On-demand skills/agents are NOT penalized for being "unused" — they are designed to load only when needed.
 
 ## `/optimize`가 하는 일
 
