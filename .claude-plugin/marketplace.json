@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "ctxcraft",
-      "source": ".",
+      "source": "./",
       "description": "Evaluate and optimize .claude/ directory token efficiency",
       "version": "1.0.0",
       "category": "productivity",
