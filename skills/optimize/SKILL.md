@@ -106,6 +106,14 @@ Move always-loaded content to on-demand skills:
 > Deep dive: /api-error-handling
 ```
 
+### Strategy 5: Rule Consolidation
+
+Merge granular rules files that cover related topics:
+
+- If 2+ rules files share >30% similar content → merge
+- If a rules file is <20 lines → consider merging into a related file
+- Target: 5-8 rules files total (not 15+)
+
 ### Strategy 6: Extract Skills References
 
 When a SKILL.md exceeds 250 lines, split verbose content into a `references/` subdirectory:
@@ -117,36 +125,9 @@ When a SKILL.md exceeds 250 lines, split verbose content into a `references/` su
 
 **Action:** Keep only the core instructions in SKILL.md, move detailed content to `references/*.md`, and add a reference link at the bottom of SKILL.md.
 
-**Before (skills/state-management/SKILL.md — 258 lines):**
-```markdown
-## Advanced Patterns
-[150 lines of detailed examples and deep-dive content]
-```
-
-**After (skills/state-management/SKILL.md — 80 lines):**
-```markdown
-## Advanced Patterns
-- 3-line summary of core rules
-> Deep dive: references/state-advanced.md
-```
-
-**After (skills/state-management/references/state-advanced.md — 180 lines):**
-```markdown
-# State Management Deep Dive
-[original detailed content]
-```
-
 **When to apply:**
 - SKILL.md > 250 lines, AND
 - The file contains independently separable sections
-
-### Strategy 5: Rule Consolidation
-
-Merge granular rules files that cover related topics:
-
-- If 2+ rules files share >30% similar content → merge
-- If a rules file is <20 lines → consider merging into a related file
-- Target: 5-8 rules files total (not 15+)
 
 ## Execution Flow
 
@@ -167,8 +148,8 @@ Merge granular rules files that cover related topics:
 ┌───────────────────────────────────────────────────┐
 │  ctxcraft — 최적화 계획                             │
 │                                                    │
-│  현재 점수: 64/100                                 │
-│  예상 점수: 85/100                                 │
+│  품질: 64/100 → 예상 85/100                        │
+│  비용: 보통 → 예상 여유 (Max 5x 기준)               │
 │  절감 토큰: ~2,100 토큰/대화                        │
 │                                                    │
 │  📋 변경 사항                                       │
@@ -193,10 +174,10 @@ After all changes are applied, you MUST re-run `/evaluate` and display the compa
 ┌─────────────────────────────────────────────────────────┐
 │  ctxcraft — Optimization Complete                       │
 │                                                         │
-│            Before      After      Savings               │
-│  Score      75/100  →  91/100   (+16 pts)               │
-│  Always-on  16,848  →   9,200   (-7,648 tokens/conv)   │
-│  Grade      B       →  A                                │
+│              Before      After      Change              │
+│  품질         75/100  →  91/100   (+16 pts)             │
+│  비용         보통    →  여유                            │
+│  Always-on   16,848  →   9,200   (-7,648 tokens/conv)  │
 │                                                         │
 │  PASS 9 → 13   WARN 3 → 1   FAIL 2 → 0                │
 └─────────────────────────────────────────────────────────┘

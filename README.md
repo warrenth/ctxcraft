@@ -138,7 +138,8 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
   💡 절감 가능: ~9168 토큰/대화
 
 ━━━ 최종 요약 ━━━
-  점수: 86/100 (A) — 훌륭합니다!
+  품질: 86/100 (A) — 훌륭합니다!
+  비용: 여유 (Max 5x 기준)
   PASS 20개  WARN 3개  FAIL 2개
 
 ━━━ Phase 3: 최적화 ━━━
@@ -157,10 +158,10 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 ┌─────────────────────────────────────────────────────┐
 │  ctxcraft — 최적화 완료                                │
 │                                                     │
-│           Before      After      절감                │
-│  점수      78/100  →  92/100   (+14점)                │
-│  상시토큰  16,848  →   9,200   (-7,648 토큰/대화)        │
-│  등급      B       →  A                              │
+│              Before      After      Change          │
+│  품질         78/100  →  92/100   (+14 pts)          │
+│  비용         보통    →  여유                         │
+│  Always-on   16,848  →   9,200   (-7,648 토큰/대화)   │
 │                                                     │
 │  PASS 20개 → 24개   WARN 3개 → 1개   FAIL 2개 → 0개    │
 └─────────────────────────────────────────────────────┘
@@ -205,10 +206,16 @@ $ curl -sL .../evaluate.sh -o /tmp/ctxcraft.sh && bash /tmp/ctxcraft.sh
 | 24 | Agent model cost | opus ≤ 2 agents | Weighted cost analysis: opus=5x, sonnet=1x, haiku=0.2x |
 | 25 | Cross-reference validity | All `/skill-name` refs exist | Broken skill references in rules/ and CLAUDE.md |
 
-## Scoring
+## Scoring — 2-Axis System
+
+ctxcraft separates **quality** (structural health) from **cost** (token budget). Quality is universal; cost depends on your plan.
+
+### Quality Score (all plans)
+
+Measures adherence risk — duplicates, broken references, structure issues.
 
 ```
-Score = 100 - (FAIL × 3) - (WARN × 1)
+Quality = 100 - (FAIL × 3) - (WARN × 1)
 ```
 
 | Grade | Score | Meaning |
@@ -218,6 +225,25 @@ Score = 100 - (FAIL × 3) - (WARN × 1)
 | B | 70–84 | Good |
 | C | 50–69 | Needs improvement |
 | D | 0–49 | Optimize immediately |
+
+### Cost Impact (per plan tier)
+
+Shows how much of your plan's context budget is consumed. Informational, not scored.
+
+| Plan | Context | Comfortable | Warning | Critical |
+|------|---------|-------------|---------|----------|
+| Pro | 200K | < 15K tokens | 15K–25K | > 25K |
+| Max 5x | 200K | < 20K tokens | 20K–35K | > 35K |
+| Max 20x | 200K | < 25K tokens | 25K–40K | > 40K |
+| Team | 200K | < 20K tokens | 20K–35K | > 35K |
+| Opus 1M | 1M | < 50K tokens | 50K–80K | > 80K |
+
+```
+┌─────────────────────────────────────┐
+│  품질: 86/100 (A)    ← universal   │
+│  비용: 여유           ← per plan   │
+└─────────────────────────────────────┘
+```
 
 > On-demand skills/agents are NOT penalized for being "unused" — they are designed to load only when needed.
 
