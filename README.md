@@ -44,23 +44,18 @@ claude plugin install ctxcraft@tools
 > }
 > ```
 
-### 방법 2: 글로벌 원라인 설치
+### 방법 2: 글로벌 설치 (기본)
 
 플러그인 시스템 없이 `~/.claude/`에 직접 설치합니다. 모든 프로젝트에서 `/evaluate`, `/optimize`를 사용할 수 있습니다.
 
 ```bash
-tmp=$(mktemp -d) && git clone --depth 1 https://github.com/warrenth/ctxcraft.git "$tmp/ctx" && \
-mkdir -p ~/.claude/{skills,rules,agents} && \
-cp -r "$tmp/ctx/skills/"* ~/.claude/skills/ && \
-cp -r "$tmp/ctx/agents/"* ~/.claude/agents/ && \
-cp "$tmp/ctx/rules/token-efficiency.md" ~/.claude/rules/ && \
-rm -rf "$tmp" && echo "✅ ctxcraft installed globally (~/.claude/)"
+curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash
 ```
 
-> **프로젝트 로컬 설치**: `~/.claude/` 대신 `.claude/`에 설치하면 해당 프로젝트에서만 사용됩니다. git commit 시 팀원도 공유 가능합니다.
+> **프로젝트 로컬 설치**: 특정 프로젝트의 `.claude/`에만 설치하려면 `--local` 플래그를 사용하세요. git commit 시 팀원도 공유 가능합니다.
 >
 > ```bash
-> curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash
+> curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash -s -- --local
 > ```
 
 ## 동작 방식
