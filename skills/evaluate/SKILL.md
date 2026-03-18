@@ -16,6 +16,24 @@ User runs `/evaluate` or asks to analyze their `.claude/` token usage.
 
 ## Execution Steps
 
+### Step 0: Detect Output Language
+
+Determine the output language for the report:
+
+1. **Check `CLAUDE.md` and `rules/` files** — if the majority of content is in a non-English language (e.g., Korean, Japanese, Chinese), use that language for the report.
+2. **Fallback** — default to **English**.
+
+**Detection heuristic:** Read the first 30 lines of `CLAUDE.md`. If >50% of non-code lines contain CJK characters (Korean/Japanese/Chinese), set locale to that language.
+
+| Detected | Report Language | Example Labels |
+|----------|----------------|----------------|
+| Korean (한국어) | Korean | 품질, 비용, 여유, 경고, 심각 |
+| Japanese (日本語) | Japanese | 品質, コスト, 良好, 警告, 重大 |
+| Chinese (中文) | Chinese | 质量, 成本, 良好, 警告, 严重 |
+| Default | English | Quality, Cost, Comfortable, Warning, Critical |
+
+Apply the detected language to ALL report output: headings, labels, descriptions, and recommendations.
+
 ### Step 1: Scan Directory Structure
 
 Scan the project's `.claude/` directory:
@@ -43,7 +61,7 @@ For each file, estimate tokens:
   - **On-demand**: `skills/`, `agents/` — loaded only when triggered
   - **Inactive**: `hooks/`, `scratch/`, config files — not counted as context tokens
 
-### Step 3: Detect Issues — Quality (품질)
+### Step 3: Detect Issues — Quality
 
 Quality issues affect **adherence** regardless of plan tier.
 
@@ -91,7 +109,7 @@ Run ALL 25 checks below. Each check results in PASS (0), WARN (-1), or FAIL (-3)
 | 10 | Agent required fields (name/description/tools) | all present | — | any missing |
 | 11 | Skill frontmatter (valid YAML `---` block) | all valid | — | any invalid |
 | 12 | Skill references links (files exist) | all exist | — | any missing |
-| 13 | Rules skill references (`> 심화` pattern) | all rules have ref | most have | < 50% have |
+| 13 | Rules skill references (`> See also` / `> 심화` pattern) | all rules have ref | most have | < 50% have |
 | 14 | Rules pure Markdown (no YAML frontmatter) | none have frontmatter | — | any have |
 | 15 | Skills orphan directories (SKILL.md exists) | none orphaned | — | any orphaned |
 | 16 | Rules flat structure (no subdirectories) | flat | — | has subdirs |
@@ -114,7 +132,7 @@ Grades: S (95+), A (85–94), B (70–84), C (50–69), D (0–49)
 
 **IMPORTANT**: Do NOT penalize on-demand skills/agents for being "unused" — they are designed to be loaded only when needed. Only penalize always-loaded files.
 
-### Step 5: Assess Cost Impact — by Plan Tier (비용)
+### Step 5: Assess Cost Impact — by Plan Tier
 
 Cost impact is **informational**, not scored. Show how much of the plan's context budget is consumed.
 
@@ -144,34 +162,53 @@ Check the current model to infer plan context:
 
 Output a clean, readable report with **two separate sections**:
 
+**English (default):**
 ```
-┌─────────────────────────────────────────────────┐
-│  ctxcraft — 토큰 효율 리포트                      │
-│                                                  │
-│  품질: XX/100       ← 구조적 건강도 (플랜 무관)    │
-│  비용: 여유|보통|주의  ← 플랜 기준 (Opus 1M)       │
-│                                                  │
-│  📊 토큰 분석                                     │
-│  상시 로드:  ~X,XXX 토큰 (XX 파일)                │
-│  온디맨드:   ~X,XXX 토큰 (XX 파일)                │
-│                                                  │
-│  🏗️ 품질 이슈                                     │
-│  🔴 심각 (N건)                                   │
-│  • [구체적 문제 + 개선 방안]                       │
-│  🟡 경고 (N건)                                   │
-│  • [구체적 문제 + 개선 방안]                       │
-│  🟢 참고 (N건)                                   │
-│  • [최적화 기회]                                  │
-│                                                  │
-│  💰 비용 영향 (Opus 1M 기준)                      │
-│  상시 로드: XX,XXX / 50,000 토큰 (XX%) — 여유     │
-│  opus 에이전트: N개 (가중 비용 XX%)                │
-│                                                  │
-│  💡 빠른 개선                                     │
-│  • [가장 쉬운 개선 3가지]                          │
-│                                                  │
-│  /optimize 실행으로 개선을 적용하세요.              │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  ctxcraft — Token Efficiency Report               │
+│                                                   │
+│  Quality: XX/100     ← structural health          │
+│  Cost: Comfortable|Warning|Critical  ← plan tier  │
+│                                                   │
+│  📊 Token Analysis                                │
+│  Always-loaded:  ~X,XXX tokens (XX files)         │
+│  On-demand:      ~X,XXX tokens (XX files)         │
+│                                                   │
+│  🏗️ Quality Issues                                │
+│  🔴 Critical (N)                                  │
+│  • [specific issue + fix]                         │
+│  🟡 Warning (N)                                   │
+│  • [specific issue + fix]                         │
+│  🟢 Info (N)                                      │
+│  • [optimization opportunity]                     │
+│                                                   │
+│  💰 Cost Impact (Opus 1M tier)                    │
+│  Always-loaded: XX,XXX / 50,000 tokens — Comfy    │
+│  opus agents: N (weighted cost XX%)               │
+│                                                   │
+│  💡 Quick Wins                                    │
+│  • [top 3 easiest improvements]                   │
+│                                                   │
+│  Run /optimize to apply improvements.             │
+└──────────────────────────────────────────────────┘
+```
+
+**Korean (when detected):**
+```
+┌──────────────────────────────────────────────────┐
+│  ctxcraft — 토큰 효율 리포트                       │
+│                                                   │
+│  품질: XX/100       ← 구조적 건강도 (플랜 무관)     │
+│  비용: 여유|보통|주의  ← 플랜 기준                   │
+│                                                   │
+│  📊 토큰 분석                                      │
+│  상시 로드:  ~X,XXX 토큰 (XX 파일)                 │
+│  온디맨드:   ~X,XXX 토큰 (XX 파일)                 │
+│                                                   │
+│  🔴 심각 (N건) / 🟡 경고 (N건) / 🟢 참고 (N건)    │
+│                                                   │
+│  /optimize 실행으로 개선을 적용하세요.               │
+└──────────────────────────────────────────────────┘
 ```
 
 ### Step 7: Save Report

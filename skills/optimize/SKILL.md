@@ -14,6 +14,14 @@ You are **ctxcraft optimizer** — you apply concrete improvements to reduce tok
 
 User runs `/optimize` or `/optimize --dry` (preview only).
 
+## Output Language
+
+Use the same locale detection as `/evaluate` (Step 0):
+- Check `CLAUDE.md` first 30 lines — if >50% non-code lines contain CJK characters, use that language
+- Default to **English**
+
+Apply detected language to all output: plan description, change summaries, confirmation prompts.
+
 ## Pre-condition
 
 Check if `.claude/scratch/ctxcraft-report.md` exists from a previous `/evaluate` run.
@@ -144,6 +152,30 @@ When a SKILL.md exceeds 250 lines, split verbose content into a `references/` su
 
 ## Output Format
 
+**English (default):**
+```
+┌───────────────────────────────────────────────────┐
+│  ctxcraft — Optimization Plan                      │
+│                                                    │
+│  Quality: 64/100 → est. 85/100                     │
+│  Cost: Warning → est. Comfortable (Max 5x)         │
+│  Savings: ~2,100 tokens/conversation               │
+│                                                    │
+│  📋 Changes                                        │
+│  1. Compress CLAUDE.md (320→148 lines)             │
+│     Savings: ~1,200 tokens                         │
+│  2. Merge 3 duplicate rules                        │
+│     Savings: ~500 tokens                           │
+│  3. Move examples to skills                        │
+│     Savings: ~400 tokens                           │
+│  4. Remove 2 unused skills                         │
+│     Freed: ~800 on-demand tokens                   │
+│                                                    │
+│  Apply? [All / Select / Preview]                   │
+└───────────────────────────────────────────────────┘
+```
+
+**Korean (when detected):**
 ```
 ┌───────────────────────────────────────────────────┐
 │  ctxcraft — 최적화 계획                             │
@@ -151,16 +183,6 @@ When a SKILL.md exceeds 250 lines, split verbose content into a `references/` su
 │  품질: 64/100 → 예상 85/100                        │
 │  비용: 보통 → 예상 여유 (Max 5x 기준)               │
 │  절감 토큰: ~2,100 토큰/대화                        │
-│                                                    │
-│  📋 변경 사항                                       │
-│  1. CLAUDE.md 압축 (320→148줄)                     │
-│     절감: ~1,200 토큰                               │
-│  2. 중복 rules 3개 병합                             │
-│     절감: ~500 토큰                                 │
-│  3. 예제를 skills로 이동                            │
-│     절감: ~400 토큰                                 │
-│  4. 미사용 skills 2개 제거                          │
-│     확보: ~800 토큰 온디맨드 예산                    │
 │                                                    │
 │  변경 적용? [전체 / 선택 / 미리보기]                 │
 └───────────────────────────────────────────────────┘
@@ -170,14 +192,29 @@ When a SKILL.md exceeds 250 lines, split verbose content into a `references/` su
 
 After all changes are applied, you MUST re-run `/evaluate` and display the comparison in this format:
 
+**English (default):**
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  ctxcraft — Optimization Complete                       │
 │                                                         │
 │              Before      After      Change              │
-│  품질         75/100  →  91/100   (+16 pts)             │
-│  비용         보통    →  여유                            │
+│  Quality      75/100  →  91/100   (+16 pts)             │
+│  Cost         Warning →  Comfortable                    │
 │  Always-on   16,848  →   9,200   (-7,648 tokens/conv)  │
+│                                                         │
+│  PASS 9 → 13   WARN 3 → 1   FAIL 2 → 0                │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Korean (when detected):**
+```
+┌─────────────────────────────────────────────────────────┐
+│  ctxcraft — 최적화 완료                                  │
+│                                                         │
+│              이전        이후       변화                  │
+│  품질         75/100  →  91/100   (+16점)                │
+│  비용         보통    →  여유                             │
+│  상시 로드   16,848  →   9,200   (-7,648 토큰/대화)      │
 │                                                         │
 │  PASS 9 → 13   WARN 3 → 1   FAIL 2 → 0                │
 └─────────────────────────────────────────────────────────┘
