@@ -127,7 +127,7 @@ Run ALL 25 checks below. Each check results in PASS (0), WARN (-1), or FAIL (-3)
 ```
 Quality Score = 100 - (FAIL_count × 3) - (WARN_count × 1)
 
-Grades: S (95+), A (85–94), B (70–84), C (50–69), D (0–49)
+Grades: A (90–100), A- (80–89), B+ (70–79), B (60–69), C (50–59), D (40–49), F (0–39)
 ```
 
 **IMPORTANT**: Do NOT penalize on-demand skills/agents for being "unused" — they are designed to be loaded only when needed. Only penalize always-loaded files.
@@ -167,7 +167,7 @@ Output a clean, readable report with **two separate sections**:
 ┌──────────────────────────────────────────────────┐
 │  ctxcraft — Token Efficiency Report               │
 │                                                   │
-│  Quality: XX/100     ← structural health          │
+│  Quality: XX/100 (Grade X)  ← structural health    │
 │  Cost: Comfortable|Warning|Critical  ← plan tier  │
 │                                                   │
 │  📊 Token Analysis                                │
@@ -198,7 +198,7 @@ Output a clean, readable report with **two separate sections**:
 ┌──────────────────────────────────────────────────┐
 │  ctxcraft — 토큰 효율 리포트                       │
 │                                                   │
-│  품질: XX/100       ← 구조적 건강도 (플랜 무관)     │
+│  품질: XX/100 (등급 X)  ← 구조적 건강도 (플랜 무관)  │
 │  비용: 여유|보통|주의  ← 플랜 기준                   │
 │                                                   │
 │  📊 토큰 분석                                      │

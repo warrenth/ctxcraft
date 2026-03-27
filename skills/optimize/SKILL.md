@@ -182,7 +182,7 @@ When a SKILL.md exceeds 150 lines, split verbose content into a `references/` su
 ┌───────────────────────────────────────────────────┐
 │  ctxcraft — Optimization Plan                      │
 │                                                    │
-│  Quality: 64/100 → est. 85/100                     │
+│  Quality: 64/100 (B) → est. 85/100 (A-)             │
 │  Cost: Warning → est. Comfortable (Max 5x)         │
 │  Savings: ~2,100 tokens/conversation               │
 │                                                    │
@@ -205,13 +205,25 @@ When a SKILL.md exceeds 150 lines, split verbose content into a `references/` su
 ┌───────────────────────────────────────────────────┐
 │  ctxcraft — 최적화 계획                             │
 │                                                    │
-│  품질: 64/100 → 예상 85/100                        │
+│  품질: 64/100 (B) → 예상 85/100 (A-)               │
 │  비용: 보통 → 예상 여유 (Max 5x 기준)               │
 │  절감 토큰: ~2,100 토큰/대화                        │
 │                                                    │
 │  변경 적용? [전체 / 선택 / 미리보기]                 │
 └───────────────────────────────────────────────────┘
 ```
+
+## Grade Scale
+
+| Score  | Grade |
+|--------|-------|
+| 90-100 | A     |
+| 80-89  | A-    |
+| 70-79  | B+    |
+| 60-69  | B     |
+| 50-59  | C     |
+| 40-49  | D     |
+| 0-39   | F     |
 
 ## Before/After Comparison Report
 
@@ -224,6 +236,7 @@ After all changes are applied, you MUST re-run `/evaluate` and display the compa
 │                                                         │
 │              Before      After      Change              │
 │  Quality      75/100  →  91/100   (+16 pts)             │
+│  Grade        B+      →  A                              │
 │  Cost         Warning →  Comfortable                    │
 │  Always-on   16,848  →   9,200   (-7,648 tokens/conv)  │
 │                                                         │
@@ -238,6 +251,7 @@ After all changes are applied, you MUST re-run `/evaluate` and display the compa
 │                                                         │
 │              이전        이후       변화                  │
 │  품질         75/100  →  91/100   (+16점)                │
+│  등급         B+      →  A                              │
 │  비용         보통    →  여유                             │
 │  상시 로드   16,848  →   9,200   (-7,648 토큰/대화)      │
 │                                                         │
