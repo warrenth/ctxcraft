@@ -103,7 +103,7 @@ $ /ctxcraft:evaluate
   💡 Potential savings: ~9,168 tokens/conversation
 
 ━━━ Summary ━━━
-  Quality: 86/100 (A)
+  Quality: 86/100 (A-)
   Cost: Comfortable (Max 5x plan)
   PASS 20  WARN 3  FAIL 2
 ```
@@ -116,6 +116,7 @@ $ /ctxcraft:evaluate
 │                                                  │
 │              Before      After       Change      │
 │  Quality     78/100  →  92/100    (+14 pts)      │
+│  Grade       B+      →  A                        │
 │  Always-on   16,848  →   9,200   (-7,648 tok)   │
 │                                                  │
 │  PASS 20 → 24   WARN 3 → 1   FAIL 2 → 0        │
@@ -132,6 +133,42 @@ $ /ctxcraft:evaluate
 6. **Self-clean** — Remove ctxcraft files after optimization
 
 All changes require user confirmation before applying.
+
+### Loop Mode (inspired by [Karpathy's AutoResearch](https://github.com/karpathy/autoresearch))
+
+```
+/optimize --loop
+```
+
+Instead of applying all strategies at once, loop mode applies **one strategy per round**, measures the impact, and automatically keeps or reverts each change — the same "change one thing → measure → keep/revert" loop that [Andrej Karpathy's AutoResearch](https://github.com/karpathy/autoresearch) uses to self-improve ML experiments.
+
+```
+Round 1: Strategy 1 (Compress CLAUDE.md)
+  B+ (72) → A- (81)  ✅ Keep   (+9 pts)
+
+Round 2: Strategy 2 (Deduplicate)
+  A- (81) → A- (80)  ❌ Revert (-1 pt)
+
+Round 3: Strategy 4 (Progressive Disclosure)
+  A- (81) → A  (91)  ✅ Keep   (+10 pts)
+
+━━━ A grade × 3 consecutive — loop stopped ━━━
+
+┌──────────────────────────────────────────┐
+│  Strategy Effectiveness                  │
+│                                          │
+│  Strategy 1 (Compress):    +9 pts  ★    │
+│  Strategy 2 (Dedup):      -1 pt  (rev)  │
+│  Strategy 4 (Disclosure): +10 pts  ★    │
+│                                          │
+│  Total: B+ (72) → A (93)  3 rounds      │
+└──────────────────────────────────────────┘
+```
+
+**Key differences from batch mode:**
+- One strategy per round (isolates each strategy's impact)
+- Auto-rollback on score drop (file-based, not git)
+- Stops when A grade (90+) achieved 3 consecutive rounds
 
 ## 25 Checks
 
@@ -185,11 +222,13 @@ Quality = 100 - (FAIL × 3) - (WARN × 1)
 
 | Grade | Score | Meaning |
 |-------|-------|---------|
-| S | 95+ | Context Master |
-| A | 85–94 | Excellent |
-| B | 70–84 | Good |
-| C | 50–69 | Needs work |
-| D | 0–49 | Optimize now |
+| A | 90–100 | Excellent |
+| A- | 80–89 | Great |
+| B+ | 70–79 | Good |
+| B | 60–69 | Fair |
+| C | 50–59 | Needs work |
+| D | 40–49 | Poor |
+| F | 0–39 | Optimize now |
 
 **Cost** shows token budget usage per plan:
 
