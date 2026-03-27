@@ -134,42 +134,6 @@ $ /ctxcraft:evaluate
 
 All changes require user confirmation before applying.
 
-### Loop Mode (inspired by [Karpathy's AutoResearch](https://github.com/karpathy/autoresearch))
-
-```
-/optimize --loop
-```
-
-Instead of applying all strategies at once, loop mode applies **one strategy per round**, measures the impact, and automatically keeps or reverts each change — the same "change one thing → measure → keep/revert" loop that [Andrej Karpathy's AutoResearch](https://github.com/karpathy/autoresearch) uses to self-improve ML experiments.
-
-```
-Round 1: Strategy 1 (Compress CLAUDE.md)
-  B+ (72) → A- (81)  ✅ Keep   (+9 pts)
-
-Round 2: Strategy 2 (Deduplicate)
-  A- (81) → A- (80)  ❌ Revert (-1 pt)
-
-Round 3: Strategy 4 (Progressive Disclosure)
-  A- (81) → A  (91)  ✅ Keep   (+10 pts)
-
-━━━ A grade × 3 consecutive — loop stopped ━━━
-
-┌──────────────────────────────────────────┐
-│  Strategy Effectiveness                  │
-│                                          │
-│  Strategy 1 (Compress):    +9 pts  ★    │
-│  Strategy 2 (Dedup):      -1 pt  (rev)  │
-│  Strategy 4 (Disclosure): +10 pts  ★    │
-│                                          │
-│  Total: B+ (72) → A (93)  3 rounds      │
-└──────────────────────────────────────────┘
-```
-
-**Key differences from batch mode:**
-- One strategy per round (isolates each strategy's impact)
-- Auto-rollback on score drop (file-based, not git)
-- Stops when A grade (90+) achieved 3 consecutive rounds
-
 ## 25 Checks
 
 ### Token Efficiency (1–8)

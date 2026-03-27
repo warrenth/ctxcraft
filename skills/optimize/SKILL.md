@@ -12,7 +12,7 @@ You are **ctxcraft optimizer** — you apply concrete improvements to reduce tok
 
 ## Trigger
 
-User runs `/optimize`, `/optimize --dry` (preview only), or `/optimize --loop` (auto-loop mode).
+User runs `/optimize` or `/optimize --dry` (preview only).
 
 ## Output Language
 
@@ -155,8 +155,6 @@ When a SKILL.md exceeds 150 lines, split verbose content into a `references/` su
 
 ## Execution Flow
 
-### Batch Mode (default: `/optimize`)
-
 ```
 1. Read .claude/scratch/ctxcraft-before.json for before state
 2. Present optimization plan with estimated savings
@@ -175,52 +173,6 @@ When a SKILL.md exceeds 150 lines, split verbose content into a `references/` su
 9. Re-run /evaluate to get after state
 10. Show before/after comparison report
 11. Clean up scratch files (ctxcraft-report.md, ctxcraft-backup/)
-```
-
-### Loop Mode (`/optimize --loop`)
-
-Inspired by Karpathy's AutoResearch — applies one strategy per round, measures impact, keeps or reverts.
-
-**Stopping criteria:** A grade (90+) achieved 3 consecutive rounds, OR all strategies exhausted.
-
-```
-1. Run /evaluate → save baseline score + snapshot to scratch/ctxcraft-backup/
-2. Determine applicable strategies (skip strategies with no actionable items)
-3. For each applicable strategy (one at a time):
-   a. Save current state snapshot to scratch/ctxcraft-round-backup/
-   b. Apply single strategy
-   c. Re-run /evaluate → get new score
-   d. Compare:
-      - Score improved or equal → ✅ Keep, update snapshot
-      - Score dropped          → ❌ Restore from scratch/ctxcraft-round-backup/
-   e. Log round result to scratch/ctxcraft-changelog.md
-   f. Check stopping criteria:
-      - If A grade (90+) for 3 consecutive rounds → stop early
-4. Show strategy effectiveness report
-5. Show before/after comparison report
-6. Clean up scratch files
-```
-
-**Round backup/restore mechanism:**
-- Before each round: copy all target files to `scratch/ctxcraft-round-backup/`
-- On rollback: restore files from `scratch/ctxcraft-round-backup/` (file copy, not git)
-- On keep: update `scratch/ctxcraft-round-backup/` with current state
-
-**Changelog format** (`scratch/ctxcraft-changelog.md`):
-```markdown
-# ctxcraft optimization changelog
-
-## Round 1: Strategy 1 (Compress CLAUDE.md)
-- Before: 72/100 (B+)
-- After:  81/100 (A-)
-- Result: ✅ Keep (+9 pts)
-- Changes: CLAUDE.md 320→148 lines
-
-## Round 2: Strategy 2 (Deduplicate)
-- Before: 81/100 (A-)
-- After:  80/100 (A-)
-- Result: ❌ Revert (-1 pt)
-- Reason: Score dropped
 ```
 
 ## Output Format
@@ -259,60 +211,6 @@ Inspired by Karpathy's AutoResearch — applies one strategy per round, measures
 │                                                    │
 │  변경 적용? [전체 / 선택 / 미리보기]                 │
 └───────────────────────────────────────────────────┘
-```
-
-## Loop Mode Output
-
-**Round progress (per strategy):**
-
-English:
-```
-Round 1: Strategy 1 (Compress CLAUDE.md)
-  B+ (72) → A- (81)  ✅ Keep  (+9 pts)
-```
-
-Korean:
-```
-라운드 1: 전략 1 (CLAUDE.md 압축)
-  B+ (72) → A- (81)  ✅ 유지  (+9점)
-```
-
-**Strategy Effectiveness Report (after loop ends):**
-
-English:
-```
-┌──────────────────────────────────────────────────┐
-│  ctxcraft — Strategy Effectiveness               │
-│                                                  │
-│  Strategy     Score Change   Result              │
-│  1. Compress     +9 pts      ✅ Keep  ★ Best    │
-│  2. Dedup        -1 pt       ❌ Revert           │
-│  3. Prune        +0 pts      ⏭ Skip (N/A)       │
-│  4. Disclosure  +10 pts      ✅ Keep  ★ Best    │
-│  5. Consolidate  +2 pts      ✅ Keep             │
-│  6. Extract      +0 pts      ⏭ Skip (N/A)       │
-│                                                  │
-│  Total: B+ (72) → A (93)  in 4 rounds           │
-│  Stopped: A grade × 3 consecutive                │
-└──────────────────────────────────────────────────┘
-```
-
-Korean:
-```
-┌──────────────────────────────────────────────────┐
-│  ctxcraft — 전략별 효과                            │
-│                                                  │
-│  전략          점수 변화     결과                  │
-│  1. 압축         +9점       ✅ 유지  ★ 최고      │
-│  2. 중복제거      -1점       ❌ 롤백              │
-│  3. 미사용정리    +0점       ⏭ 건너뜀 (해당없음)   │
-│  4. 단계적공개   +10점       ✅ 유지  ★ 최고      │
-│  5. 규칙통합      +2점       ✅ 유지              │
-│  6. 참조분리      +0점       ⏭ 건너뜀 (해당없음)   │
-│                                                  │
-│  합계: B+ (72) → A (93)  4라운드                  │
-│  종료: A등급 × 3회 연속 달성                       │
-└──────────────────────────────────────────────────┘
 ```
 
 ## Grade Scale
@@ -371,8 +269,6 @@ After optimization is complete, clean up temporary scratch files only:
 1. Delete .claude/scratch/ctxcraft-report.md (if exists)
 2. Delete .claude/scratch/ctxcraft-backup/ (if exists)
 3. Delete .claude/scratch/ctxcraft-before.json (if exists)
-4. Delete .claude/scratch/ctxcraft-round-backup/ (if exists, loop mode)
-5. Delete .claude/scratch/ctxcraft-changelog.md (if exists, loop mode)
 ```
 
 > **Note:** Do NOT delete ctxcraft skills/agents — they may be installed globally via plugin system (`~/.claude/plugins/`) or locally for reuse. Only clean up temporary working files.
@@ -386,6 +282,3 @@ After optimization is complete, clean up temporary scratch files only:
 - After optimization, run evaluation again to show improvement
 - Save backup of original files to `.claude/scratch/ctxcraft-backup/` before changes
 - ALWAYS clean up scratch files after optimization is done (NOT the plugin itself)
-- In loop mode: apply ONE strategy per round, never batch multiple strategies
-- In loop mode: rollback uses file copy from scratch/ctxcraft-round-backup/, NOT git restore
-- In loop mode: show round progress after each strategy before moving to next
