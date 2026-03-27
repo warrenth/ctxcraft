@@ -98,6 +98,17 @@ Move always-loaded content to on-demand skills:
 
 **Action:** Extract verbose sections from rules/ into new skills, leave a one-line reference.
 
+**Dedup Check:** Before adding content to a skill, check for duplicates:
+1. Extract key identifiers (function names, pattern names, class names) from the rules/ code block being moved
+2. Grep the target SKILL.md for those identifiers
+3. If found → remove from rules/ only, do NOT modify the skill (already covered)
+4. If not found → remove from rules/ AND append the content to the skill
+
+**Post-move Chain:** After all Strategy 4 moves complete:
+- Count lines of each modified skill SKILL.md
+- If any skill exceeds 150 lines → auto-trigger Strategy 6 on that skill (extract to references/)
+- Log which skills were chained to Strategy 6 in the optimization plan
+
 **Before (rules/api-design.md — 120 lines always loaded):**
 ```markdown
 ## Error Responses
@@ -124,7 +135,7 @@ Merge granular rules files that cover related topics:
 
 ### Strategy 6: Extract Skills References
 
-When a SKILL.md exceeds 250 lines, split verbose content into a `references/` subdirectory:
+When a SKILL.md exceeds 150 lines, split verbose content into a `references/` subdirectory:
 
 **What to extract:**
 - Long code examples and templates
@@ -134,8 +145,13 @@ When a SKILL.md exceeds 250 lines, split verbose content into a `references/` su
 **Action:** Keep only the core instructions in SKILL.md, move detailed content to `references/*.md`, and add a reference link at the bottom of SKILL.md.
 
 **When to apply:**
-- SKILL.md > 250 lines, AND
+- SKILL.md > 150 lines, AND
 - The file contains independently separable sections
+
+**Auto-trigger from Strategy 4:** This strategy runs automatically (no separate user confirmation needed) when Strategy 4 causes a skill to exceed 150 lines. In this case:
+1. Identify which sections were newly added by Strategy 4
+2. Extract those sections (plus any other verbose content) into `references/`
+3. Report the chain action in the optimization plan output
 
 ## Execution Flow
 
@@ -144,10 +160,19 @@ When a SKILL.md exceeds 250 lines, split verbose content into a `references/` su
 2. Present optimization plan with estimated savings
 3. Ask user: "Apply all? Select specific? Preview only?"
 4. For --dry flag: show diffs without applying
-5. Apply changes with user confirmation per strategy
-6. Re-run /evaluate to get after state
-7. Show before/after comparison report
-8. Clean up scratch files (ctxcraft-report.md, ctxcraft-backup/)
+5. Apply Strategy 1-3 (CLAUDE.md compress, dedup, prune unused)
+6. Apply Strategy 4 with dedup check:
+   - Extract code blocks from rules/
+   - Grep target skill for key identifiers
+   - If duplicate → remove from rules/ only (skip skill)
+   - If new → remove from rules/ AND add to skill
+7. Strategy 4→6 chain check:
+   - Count lines of each skill modified in step 6
+   - If >150 lines → auto-run Strategy 6 (extract to references/)
+8. Apply Strategy 5 (Rule Consolidation)
+9. Re-run /evaluate to get after state
+10. Show before/after comparison report
+11. Clean up scratch files (ctxcraft-report.md, ctxcraft-backup/)
 ```
 
 ## Output Format
