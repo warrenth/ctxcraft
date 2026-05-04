@@ -26,7 +26,7 @@ AI coding agents (Claude Code, Cursor, Windsurf) load context files on every con
 # Add marketplace (one-time)
 claude plugin marketplace add warrenth/ctxcraft
 
-# Install plugin
+# Install plugin (run per project)
 claude plugin install ctxcraft@tools
 ```
 
@@ -37,6 +37,8 @@ Then in Claude Code:
 /ctxcraft:optimize    # Auto-fix issues
 /ctxcraft:token-guide # Best practices reference
 ```
+
+> **Note:** `claude plugin install` must be run in each project. Despite `scope: user`, Claude Code plugins are not truly global — you need to reinstall when switching to a new project.
 
 <details>
 <summary>Team auto-install via settings.json</summary>
