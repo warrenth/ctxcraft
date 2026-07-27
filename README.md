@@ -18,6 +18,8 @@ AI coding agents (Claude Code, Cursor, Windsurf) load context files on every con
 
 **ctxcraft finds and fixes all of this.**
 
+> **vs `/doctor`?** Claude Code's built-in `/doctor` proposes trims for a checked-in CLAUDE.md. ctxcraft audits the whole `.claude/` surface — rules/, skills/, agents/, legacy commands/, auto memory — with a quality score, a plan-tier cost axis, and CI integration. Thresholds follow the [official docs](https://code.claude.com/docs/en/memory.md).
+
 ## Quick Start
 
 ### Option 1: Plugin Marketplace (Recommended)
@@ -73,7 +75,9 @@ curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | b
 
 </details>
 
-> ctxcraft uses only read-only tools (Read, Grep, Glob) — **no permission prompts** needed.
+> `/evaluate` uses read-only tools (Read, Grep, Glob) — **no permission prompts**. `/optimize` additionally uses Write/Edit and **always asks before applying** any change.
+>
+> Note: plugin installs don't load the optional always-on rules file (`rules/token-efficiency.md`) — plugins can't ship `rules/`. The `install.sh` path offers to copy it to `~/.claude/rules/` instead.
 
 ## How It Works
 
@@ -132,7 +136,7 @@ $ /ctxcraft:evaluate
 3. **Clean up** — Identify and remove unused skills/agents
 4. **Restructure** — Move always-on content to on-demand skills
 5. **Split references** — Extract details from large SKILL.md (>250 lines) into references/
-6. **Self-clean** — Remove ctxcraft files after optimization
+6. **Self-clean** — Remove temporary scratch files after optimization (never the plugin itself)
 
 All changes require user confirmation before applying.
 
@@ -142,13 +146,13 @@ All changes require user confirmation before applying.
 
 | # | Check | Threshold | What it measures |
 |---|-------|-----------|------------------|
-| 1 | CLAUDE.md size | ≤ 500 lines | Core file loaded every conversation |
-| 2 | Always-on tokens | ≤ 8,000 | Total tokens from CLAUDE.md + rules/ |
-| 3 | Rules file size | 100–130 lines | Individual rule file bloat |
+| 1 | CLAUDE.md size | ≤ 200 lines (official) | Core file loaded every conversation; > 500 fails |
+| 2 | Always-on tokens | ≤ 8,000 | CLAUDE.md (+ `@imports`) + non-scoped rules/ |
+| 3 | Rules file size | ≤ 150 lines | Individual rule file bloat |
 | 4 | Rules file count | ≤ 15 | Too many rules → consolidate |
 | 5 | Duplicate sections | 0 | Overlap between CLAUDE.md ↔ rules/ |
 | 6 | Progressive disclosure | On-demand 50%+ | Always-on vs on-demand ratio |
-| 7 | Skills file size | ≤ 250 lines | Individual skill file bloat |
+| 7 | Skills file size | ≤ 500 lines (official; 150 strict) | Individual skill file bloat |
 | 8 | Token allocation ratio | Always-on ≤ 30% | Always-on share of total context |
 
 <details>
@@ -157,18 +161,18 @@ All changes require user confirmation before applying.
 | # | Check | What it measures |
 |---|-------|------------------|
 | 9 | Agent frontmatter | YAML `---` block validity |
-| 10 | Agent required fields | name/description/tools presence |
+| 10 | Agent required fields | name/description presence (tools optional per spec) |
 | 11 | Skill frontmatter | YAML `---` block validity |
 | 12 | Skill references links | references/*.md link validity |
 | 13 | Rules skill references | Deep-dive `/skill-name` links |
-| 14 | Rules pure Markdown | No YAML frontmatter in rules |
+| 14 | Rules conditional loading | `paths:` frontmatter usage (official lazy-load) |
 | 15 | Skills orphan directories | SKILL.md must exist in each dir |
-| 16 | Rules flat structure | No subdirectories allowed |
+| 16 | Skill description length | description + when_to_use ≤ 1,536 chars |
 | 17 | Agent skills references | skills/ directory exists |
 | 18 | Agent least privilege | Read-only agents don't get Write/Edit |
 | 19 | Rules enforcement keywords | MUST/SHOULD/NEVER (RFC 2119) |
 | 20 | CLAUDE.md ↔ Skills sync | Referenced skills actually exist |
-| 21 | Auto-learning system | memory + hooks + promotion pipeline |
+| 21 | Auto memory | MEMORY.md within its 200-line/25KB load limit |
 | 22 | Agent model specified | Model field for cost control |
 | 23 | Context saving | scratch dir + save rules |
 | 24 | Agent model cost | opus ≤ 2 agents (weighted cost) |
@@ -180,10 +184,11 @@ All changes require user confirmation before applying.
 
 ctxcraft uses a **2-axis system** — quality (universal) and cost (plan-dependent).
 
-**Quality** measures structural health:
+**Quality** measures structural health (N/A checks are excluded — no free points):
 
 ```
-Quality = 100 - (FAIL × 3) - (WARN × 1)
+PASS = 10, WARN = 5, FAIL = 0 per check
+Quality = earned points / (scored checks × 10) × 100
 ```
 
 | Grade | Score | Meaning |
@@ -230,10 +235,9 @@ ctxcraft/
 
 ## Supported Environments
 
-- [x] Claude Code
-- [ ] Cursor (planned)
-- [ ] Windsurf (planned)
-- [ ] Cline (planned)
+- [x] **Claude Code** — full support (rules/, skills/, agents/, plugin, CI action)
+- [x] **Agent Skills-compatible tools** (Cursor, GitHub Copilot, Gemini CLI, OpenAI Codex, …) — ctxcraft's skills follow the [Agent Skills open standard](https://agentskills.io), so the evaluate/optimize skills load in any compatible tool. Evaluation of those tools' own config layouts is planned
+- [ ] Windsurf / Cline config layouts (planned)
 
 ## Contributing
 

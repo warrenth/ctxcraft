@@ -22,16 +22,16 @@ done
 # ─────────────────────────────────────────────
 CLAUDE_DIR=".claude"
 ROOT_CLAUDE="CLAUDE.md"
-REPO_URL="https://github.com/warrenth/ctxcraft.git"
 TOKENS_PER_LINE=12
 
-CLAUDE_MD_MAX=500
-RULES_MAX=130
+CLAUDE_MD_WARN=200          # 공식 권장 상한 (memory.md: "target under 200 lines")
+CLAUDE_MD_MAX=500           # 초과 시 FAIL
+RULES_MAX=150
 RULES_MIN=80
-SKILLS_MAX=250
-AGENTS_MAX=150
+SKILLS_STRICT=150           # ctxcraft 권장 — 초과 시 references/ 분리 제안
+SKILLS_MAX=500              # 공식 상한 (skills.md: "Keep SKILL.md under 500 lines")
 ALWAYS_LOADED_WARN=8000
-ALWAYS_LOADED_CRITICAL=15000
+ALWAYS_LOADED_CRITICAL=12000
 RULES_COUNT_MAX=15
 DUP_HEADING_THRESHOLD=1
 
@@ -158,6 +158,56 @@ count_lines() {
     fi
 }
 
+# 유효 줄 수 — 블록 HTML 주석은 주입 전 제거되므로 제외 (공식: memory.md)
+count_effective_lines() {
+    if [ -f "$1" ]; then
+        awk '
+            inc { if (index($0, "-->")) inc = 0; next }
+            /^[[:space:]]*<!--/ { if (!index($0, "-->")) inc = 1; next }
+            { n++ }
+            END { print n + 0 }
+        ' "$1"
+    else
+        echo "0"
+    fi
+}
+
+# rules frontmatter에 paths: 가 있으면 조건부 로딩 = 온디맨드 (공식: path-specific rules)
+has_paths_frontmatter() {
+    local first_line
+    first_line=$(head -1 "$1" 2>/dev/null | tr -d '\r')
+    [ "$first_line" = "---" ] || return 1
+    awk 'NR==1{next} /^---[[:space:]]*$/{exit} /^paths:/{f=1; exit} END{exit f?0:1}' "$1"
+}
+
+# CLAUDE.md @import 체인 수집 — 시작 시 전부 로드됨, 최대 4 depth (공식: memory.md)
+IMPORT_VISITED="|"
+collect_import_lines() {
+    local file="$1" depth="$2"
+    local total=0
+    [ "$depth" -ge 4 ] && { echo 0; return; }
+    [ -f "$file" ] || { echo 0; return; }
+    local dir refs r target l sub
+    dir=$(dirname "$file")
+    # 코드 펜스/인라인 백틱 제거 후 @path 토큰 추출 (백틱 안 @는 import 아님)
+    refs=$(awk '/^```/{fence=!fence; next} !fence{ gsub(/`[^`]*`/, ""); print }' "$file" \
+        | grep -oE '(^|[[:space:]])@[~A-Za-z0-9_./-]+' | sed 's/^[[:space:]]*//;s/^@//' | sort -u || true)
+    for r in $refs; do
+        case "$r" in
+            "~"*) target="${HOME}${r#\~}" ;;
+            /*)   target="$r" ;;
+            *)    target="${dir}/${r}" ;;
+        esac
+        [ -f "$target" ] || continue
+        if echo "$IMPORT_VISITED" | grep -qF "|${target}|"; then continue; fi
+        IMPORT_VISITED="${IMPORT_VISITED}${target}|"
+        l=$(count_effective_lines "$target")
+        sub=$(collect_import_lines "$target" $((depth + 1)))
+        total=$((total + l + sub))
+    done
+    echo "$total"
+}
+
 # ─────────────────────────────────────────────
 # 시작
 # ─────────────────────────────────────────────
@@ -212,39 +262,52 @@ rules_count=0
 skills_count=0
 agents_count=0
 
-# CLAUDE.md 줄 수
+# CLAUDE.md 줄 수 (HTML 주석 제외) + @import 체인 (시작 시 로드됨)
 claude_md_lines=0
+import_lines=0
 if [ -f "$ROOT_CLAUDE" ]; then
-    claude_md_lines=$(count_lines "$ROOT_CLAUDE")
+    claude_md_lines=$(count_effective_lines "$ROOT_CLAUDE")
     always_lines=$((always_lines + claude_md_lines))
     always_files=$((always_files + 1))
+    import_lines=$((import_lines + $(collect_import_lines "$ROOT_CLAUDE" 0)))
 fi
 if [ -f "$CLAUDE_DIR/CLAUDE.md" ]; then
-    lines=$(count_lines "$CLAUDE_DIR/CLAUDE.md")
+    lines=$(count_effective_lines "$CLAUDE_DIR/CLAUDE.md")
     always_lines=$((always_lines + lines))
     always_files=$((always_files + 1))
     claude_md_lines=$((claude_md_lines + lines))
+    import_lines=$((import_lines + $(collect_import_lines "$CLAUDE_DIR/CLAUDE.md" 0)))
 fi
+always_lines=$((always_lines + import_lines))
 
-# rules 수집
+# rules 수집 — 재귀 탐색 (하위 디렉토리 공식 지원), paths: frontmatter는 온디맨드 분류
 declare -a OVERSIZED_RULES
 rules_lines=0
+rules_scoped_count=0
 if [ -d "$CLAUDE_DIR/rules" ]; then
-    for f in "$CLAUDE_DIR/rules/"*.md; do
+    while IFS= read -r f; do
         [ -f "$f" ] || continue
-        lines=$(count_lines "$f")
+        lines=$(count_effective_lines "$f")
         rules_count=$((rules_count + 1))
-        rules_lines=$((rules_lines + lines))
-        always_lines=$((always_lines + lines))
-        always_files=$((always_files + 1))
+        if has_paths_frontmatter "$f"; then
+            # path-scoped rule — 매칭 파일을 읽을 때만 로드됨
+            rules_scoped_count=$((rules_scoped_count + 1))
+            ondemand_lines=$((ondemand_lines + lines))
+            ondemand_files=$((ondemand_files + 1))
+        else
+            rules_lines=$((rules_lines + lines))
+            always_lines=$((always_lines + lines))
+            always_files=$((always_files + 1))
+        fi
         if [ "$lines" -gt "$RULES_MAX" ]; then
             OVERSIZED_RULES+=("$(basename "$f"):${lines}")
         fi
-    done
+    done < <(find "$CLAUDE_DIR/rules" -name "*.md" 2>/dev/null)
 fi
 
 # skills 수집
 declare -a OVERSIZED_SKILLS
+skills_over_official=0
 if [ -d "$CLAUDE_DIR/skills" ]; then
     while IFS= read -r f; do
         [ -f "$f" ] || continue
@@ -252,11 +315,24 @@ if [ -d "$CLAUDE_DIR/skills" ]; then
         skills_count=$((skills_count + 1))
         ondemand_lines=$((ondemand_lines + lines))
         ondemand_files=$((ondemand_files + 1))
-        if [ "$lines" -gt "$SKILLS_MAX" ]; then
+        if [ "$lines" -gt "$SKILLS_STRICT" ]; then
             skill_name=$(echo "$f" | sed "s|$CLAUDE_DIR/skills/||" | sed 's|/SKILL.md||')
             OVERSIZED_SKILLS+=("${skill_name}:${lines}")
         fi
+        [ "$lines" -gt "$SKILLS_MAX" ] && skills_over_official=$((skills_over_official + 1))
     done < <(find "$CLAUDE_DIR/skills" -name "SKILL.md" 2>/dev/null)
+fi
+
+# legacy commands 수집 — 스킬에 병합된 기능이지만 기존 파일도 계속 동작 (온디맨드 로드)
+commands_count=0
+if [ -d "$CLAUDE_DIR/commands" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        lines=$(count_lines "$f")
+        commands_count=$((commands_count + 1))
+        ondemand_lines=$((ondemand_lines + lines))
+        ondemand_files=$((ondemand_files + 1))
+    done < <(find "$CLAUDE_DIR/commands" -name "*.md" 2>/dev/null)
 fi
 
 # agents 수집
@@ -287,20 +363,25 @@ echo ""
 
 # ─── 검증 항목 ───
 
-# [1] CLAUDE.md 크기
+# [1] CLAUDE.md 크기 — 공식 권장 200줄 (memory.md: "target under 200 lines")
 if [ "$claude_md_lines" -eq 0 ]; then
     add_result "CLAUDE.md 크기" "WARN" "CLAUDE.md 파일 없음" 0 "CLAUDE.md 생성 권장"
+elif [ "$claude_md_lines" -le "$CLAUDE_MD_WARN" ]; then
+    add_result "CLAUDE.md 크기" "PASS" "${claude_md_lines}줄 (공식 기준: ${CLAUDE_MD_WARN}줄 이하)" 0
 elif [ "$claude_md_lines" -le "$CLAUDE_MD_MAX" ]; then
-    add_result "CLAUDE.md 크기" "PASS" "${claude_md_lines}줄 (기준: ${CLAUDE_MD_MAX}줄 이하)" 0
+    save=$((claude_md_lines - CLAUDE_MD_WARN))
+    add_result "CLAUDE.md 크기" "WARN" "${claude_md_lines}줄 — 공식 권장 ${CLAUDE_MD_WARN}줄 초과 (adherence 저하)" $((save * TOKENS_PER_LINE)) "path-scoped rules로 분리 또는 skills로 이동"
 else
-    save=$((claude_md_lines - 150))
-    add_result "CLAUDE.md 크기" "FAIL" "${claude_md_lines}줄 → ${CLAUDE_MD_MAX}줄 이하로 압축 필요" $((save * TOKENS_PER_LINE)) "중복 설명 제거, 불릿/테이블로 압축"
+    save=$((claude_md_lines - CLAUDE_MD_WARN))
+    add_result "CLAUDE.md 크기" "FAIL" "${claude_md_lines}줄 → ${CLAUDE_MD_WARN}줄 이하로 압축 필요" $((save * TOKENS_PER_LINE)) "중복 설명 제거, 불릿/테이블로 압축, paths: rules 분리"
 fi
 print_check 1 "${CHECK_NAMES[0]}" "${CHECK_STATUS[0]}" "${CHECK_DETAIL[0]}"
 
 # [2] 상시 로드 총량
+import_note=""
+[ "$import_lines" -gt 0 ] && import_note=", @import ${import_lines}줄 포함"
 if [ "$always_tokens" -le "$ALWAYS_LOADED_WARN" ]; then
-    add_result "상시 로드 토큰" "PASS" "~${always_tokens} 토큰 (${always_files}개 파일) — 기준: ${ALWAYS_LOADED_WARN} 이하" 0
+    add_result "상시 로드 토큰" "PASS" "~${always_tokens} 토큰 (${always_files}개 파일${import_note}) — 기준: ${ALWAYS_LOADED_WARN} 이하" 0
 elif [ "$always_tokens" -le "$ALWAYS_LOADED_CRITICAL" ]; then
     add_result "상시 로드 토큰" "WARN" "~${always_tokens} 토큰 — 기준 ${ALWAYS_LOADED_WARN} 초과" $((always_tokens - ALWAYS_LOADED_WARN)) "rules 파일 압축 또는 skills로 이동"
 else
@@ -370,13 +451,13 @@ else
 fi
 print_check 6 "${CHECK_NAMES[5]}" "${CHECK_STATUS[5]}" "${CHECK_DETAIL[5]}"
 
-# [7] Skills 파일 크기
+# [7] Skills 파일 크기 — 공식 상한 500줄 (skills.md), ctxcraft 권장 150줄
 if [ "$skills_count" -eq 0 ]; then
     add_result "Skills 파일 크기" "PASS" "skills 없음 (해당 없음)" 0
 elif [ ${#OVERSIZED_SKILLS[@]} -eq 0 ]; then
-    add_result "Skills 파일 크기" "PASS" "모든 SKILL.md ${SKILLS_MAX}줄 이하 (${skills_count}개)" 0
+    add_result "Skills 파일 크기" "PASS" "모든 SKILL.md ${SKILLS_STRICT}줄 이하 (${skills_count}개, 공식 상한 ${SKILLS_MAX}줄)" 0
 else
-    detail="기준(${SKILLS_MAX}줄) 초과 ${#OVERSIZED_SKILLS[@]}개:"
+    detail="권장(${SKILLS_STRICT}줄) 초과 ${#OVERSIZED_SKILLS[@]}개:"
     hint_files=""
     for entry in "${OVERSIZED_SKILLS[@]}"; do
         name="${entry%%:*}"
@@ -384,7 +465,11 @@ else
         detail="${detail} ${name}(${lines}줄)"
         hint_files="${hint_files}${name} "
     done
-    add_result "Skills 파일 크기" "WARN" "$detail" 0 "${hint_files% }— 상세 내용을 references/ 하위 폴더로 분리"
+    if [ "$skills_over_official" -gt 0 ]; then
+        add_result "Skills 파일 크기" "FAIL" "공식 상한(${SKILLS_MAX}줄) 초과 ${skills_over_official}개 — $detail" 0 "${hint_files% }— 상세 내용을 references/ 하위 폴더로 분리 (Agent Skills 표준 규약)"
+    else
+        add_result "Skills 파일 크기" "WARN" "$detail (공식 상한 ${SKILLS_MAX}줄 이내)" 0 "${hint_files% }— 상세 내용을 references/ 하위 폴더로 분리"
+    fi
 fi
 print_check 7 "${CHECK_NAMES[6]}" "${CHECK_STATUS[6]}" "${CHECK_DETAIL[6]}"
 
@@ -432,16 +517,17 @@ else
 fi
 print_check 9 "${CHECK_NAMES[8]}" "${CHECK_STATUS[8]}" "${CHECK_DETAIL[8]}"
 
-# [10] Agent 필수 필드 검증 (name, description, tools)
+# [10] Agent 필수 필드 검증 — 공식 스펙 필수는 name/description 뿐 (tools는 선택, 생략 시 전체 상속)
 agent_missing_fields=0
 agent_missing_list=""
+agent_no_tools=0
 if [ -d "$CLAUDE_DIR/agents" ]; then
     while IFS= read -r f; do
         [ -f "$f" ] || continue
         missing=""
         grep -q "^name:" "$f" 2>/dev/null || missing="${missing}name "
         grep -q "^description:" "$f" 2>/dev/null || missing="${missing}description "
-        grep -q "^tools:" "$f" 2>/dev/null || missing="${missing}tools "
+        grep -q "^tools:" "$f" 2>/dev/null || agent_no_tools=$((agent_no_tools + 1))
         if [ -n "$missing" ]; then
             agent_missing_fields=$((agent_missing_fields + 1))
             agent_missing_list="${agent_missing_list} $(basename "$f")[${missing% }]"
@@ -451,9 +537,11 @@ fi
 if [ "$agents_count" -eq 0 ]; then
     add_result "Agent 필수 필드" "PASS" "agents 없음 (해당 없음)" 0
 elif [ "$agent_missing_fields" -eq 0 ]; then
-    add_result "Agent 필수 필드" "PASS" "모든 agent 파일 필수 필드(name/description/tools) 존재 (${agents_count}개)" 0
+    tools_note=""
+    [ "$agent_no_tools" -gt 0 ] && tools_note=" (tools 미지정 ${agent_no_tools}개 — 전체 도구 상속, 최소권한 위해 명시 권장)"
+    add_result "Agent 필수 필드" "PASS" "모든 agent에 필수 필드(name/description) 존재 (${agents_count}개)${tools_note}" 0
 else
-    add_result "Agent 필수 필드" "WARN" "필수 필드 누락 ${agent_missing_fields}개:${agent_missing_list}" 0 "frontmatter에 name:/description:/tools: 필드 추가"
+    add_result "Agent 필수 필드" "WARN" "필수 필드 누락 ${agent_missing_fields}개:${agent_missing_list}" 0 "frontmatter에 name:/description: 추가 (공식 필수 필드 — tools는 선택)"
 fi
 print_check 10 "${CHECK_NAMES[9]}" "${CHECK_STATUS[9]}" "${CHECK_DETAIL[9]}"
 
@@ -483,7 +571,7 @@ if [ "$skills_count" -eq 0 ]; then
 elif [ "$skill_bad" -eq 0 ]; then
     add_result "Skill Frontmatter" "PASS" "모든 SKILL.md frontmatter 유효 (${skills_count}개)" 0
 else
-    add_result "Skill Frontmatter" "WARN" "frontmatter 누락/불완전 ${skill_bad}개:${skill_bad_list}" 0 "SKILL.md 최상단에 name:/description:/command: YAML 블록 추가"
+    add_result "Skill Frontmatter" "WARN" "frontmatter 누락/불완전 ${skill_bad}개:${skill_bad_list}" 0 "SKILL.md 최상단 ---...--- 블록을 닫고 description: 추가 (공식 스펙상 모든 필드 선택, description 권장)"
 fi
 print_check 11 "${CHECK_NAMES[10]}" "${CHECK_STATUS[10]}" "${CHECK_DETAIL[10]}"
 
@@ -520,7 +608,7 @@ rules_with_ref=0
 rules_without_ref=0
 rules_without_list=""
 if [ -d "$CLAUDE_DIR/rules" ] && [ "$rules_count" -gt 0 ]; then
-    for f in "$CLAUDE_DIR/rules/"*.md; do
+    while IFS= read -r f; do
         [ -f "$f" ] || continue
         # > 로 시작하는 참조 패턴 (심화, 참조, See, deep dive 등)
         if grep -qE "^>\s*(심화|참조|See|deep dive|자세히|더 보기)" "$f" 2>/dev/null; then
@@ -529,7 +617,7 @@ if [ -d "$CLAUDE_DIR/rules" ] && [ "$rules_count" -gt 0 ]; then
             rules_without_ref=$((rules_without_ref + 1))
             rules_without_list="${rules_without_list} $(basename "$f")"
         fi
-    done
+    done < <(find "$CLAUDE_DIR/rules" -name "*.md" 2>/dev/null)
 fi
 if [ "$rules_count" -eq 0 ]; then
     add_result "Rules 스킬 참조" "PASS" "rules 없음 (해당 없음)" 0
@@ -542,25 +630,15 @@ else
 fi
 print_check 13 "${CHECK_NAMES[12]}" "${CHECK_STATUS[12]}" "${CHECK_DETAIL[12]}"
 
-# [14] Rules 순수 Markdown (YAML frontmatter 없음)
-rules_with_yaml=0
-rules_yaml_list=""
-if [ -d "$CLAUDE_DIR/rules" ]; then
-    for f in "$CLAUDE_DIR/rules/"*.md; do
-        [ -f "$f" ] || continue
-        first_line=$(head -1 "$f" 2>/dev/null | tr -d '\r')
-        if [ "$first_line" = "---" ]; then
-            rules_with_yaml=$((rules_with_yaml + 1))
-            rules_yaml_list="${rules_yaml_list} $(basename "$f")"
-        fi
-    done
-fi
+# [14] Rules 조건부 로딩 — paths: frontmatter가 있는 rule은 매칭 파일 작업 시에만 로드 (공식 기능)
 if [ "$rules_count" -eq 0 ]; then
-    add_result "Rules 순수 Markdown" "PASS" "rules 없음 (해당 없음)" 0
-elif [ "$rules_with_yaml" -eq 0 ]; then
-    add_result "Rules 순수 Markdown" "PASS" "모든 rules 파일 순수 Markdown (YAML frontmatter 없음)" 0
+    add_result "Rules 조건부 로딩" "PASS" "rules 없음 (해당 없음)" 0
+elif [ "$rules_scoped_count" -gt 0 ]; then
+    add_result "Rules 조건부 로딩" "PASS" "path-scoped rules ${rules_scoped_count}/${rules_count}개 — 매칭 파일 작업 시에만 로드됨" 0
+elif [ $((rules_lines * TOKENS_PER_LINE)) -le 3000 ]; then
+    add_result "Rules 조건부 로딩" "PASS" "상시 rules 규모 작음 (~$((rules_lines * TOKENS_PER_LINE)) 토큰) — 조건부 로딩 불필요" 0
 else
-    add_result "Rules 순수 Markdown" "FAIL" "YAML frontmatter 있는 rules ${rules_with_yaml}개:${rules_yaml_list} — rules는 frontmatter 불필요" 0 "${rules_yaml_list% }— 파일 상단의 ---...--- 블록 제거"
+    add_result "Rules 조건부 로딩" "WARN" "상시 rules ~$((rules_lines * TOKENS_PER_LINE)) 토큰, path-scoped rule 없음" 0 "파일 타입 특화 rule에 paths: frontmatter 추가 — 매칭 파일 읽을 때만 로드되어 상시 토큰 절감"
 fi
 print_check 14 "${CHECK_NAMES[13]}" "${CHECK_STATUS[13]}" "${CHECK_DETAIL[13]}"
 
@@ -584,20 +662,31 @@ else
 fi
 print_check 15 "${CHECK_NAMES[14]}" "${CHECK_STATUS[14]}" "${CHECK_DETAIL[14]}"
 
-# [16] Rules 평면 구조 (하위 디렉토리 없어야 함)
-rules_subdir=0
-rules_subdir_list=""
-if [ -d "$CLAUDE_DIR/rules" ]; then
-    for d in "$CLAUDE_DIR/rules/"*/; do
-        [ -d "$d" ] || continue
-        rules_subdir=$((rules_subdir + 1))
-        rules_subdir_list="${rules_subdir_list} $(basename "$d")"
-    done
+# [16] Skill Description 길이 — description + when_to_use 합산 1,536자 초과분은 스킬 목록에서 잘림 (공식 스펙)
+desc_over=0
+desc_over_list=""
+if [ -d "$CLAUDE_DIR/skills" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        desc_len=$(awk '
+            NR==1 { if ($0 !~ /^---/) exit; next }
+            /^---[[:space:]]*$/ { exit }
+            /^(description|when_to_use):/ { s = s $0 }
+            END { print length(s) + 0 }
+        ' "$f")
+        if [ "${desc_len:-0}" -gt 1536 ]; then
+            desc_over=$((desc_over + 1))
+            skill_name=$(echo "$f" | sed "s|$CLAUDE_DIR/skills/||" | sed 's|/SKILL.md||')
+            desc_over_list="${desc_over_list} ${skill_name}(${desc_len}자)"
+        fi
+    done < <(find "$CLAUDE_DIR/skills" -name "SKILL.md" 2>/dev/null)
 fi
-if [ "$rules_subdir" -eq 0 ]; then
-    add_result "Rules 평면 구조" "PASS" "rules/ 하위 디렉토리 없음 — 올바른 구조" 0
+if [ "$skills_count" -eq 0 ]; then
+    add_result "Skill Description 길이" "PASS" "skills 없음 (해당 없음)" 0
+elif [ "$desc_over" -eq 0 ]; then
+    add_result "Skill Description 길이" "PASS" "모든 skill description ≤ 1,536자 (상한 초과분은 목록에서 잘림)" 0
 else
-    add_result "Rules 평면 구조" "FAIL" "rules/ 안에 하위 디렉토리 ${rules_subdir}개:${rules_subdir_list} — rules는 flat .md 파일만 허용" 0 "${rules_subdir_list% }— 하위 폴더 제거 후 .md 파일을 rules/ 루트로 이동"
+    add_result "Skill Description 길이" "WARN" "1,536자 초과 ${desc_over}개:${desc_over_list}" 0 "description 압축 — 1,536자 초과분은 스킬 목록에서 잘려 전달되지 않음"
 fi
 print_check 16 "${CHECK_NAMES[15]}" "${CHECK_STATUS[15]}" "${CHECK_DETAIL[15]}"
 
@@ -679,7 +768,7 @@ print_check 18 "${CHECK_NAMES[17]}" "${CHECK_STATUS[17]}" "${CHECK_DETAIL[17]}"
 rules_no_keywords=0
 rules_no_kw_list=""
 if [ -d "$CLAUDE_DIR/rules" ] && [ "$rules_count" -gt 0 ]; then
-    for f in "$CLAUDE_DIR/rules/"*.md; do
+    while IFS= read -r f; do
         [ -f "$f" ] || continue
         missing_kw=""
         grep -q "MUST\|반드시" "$f" 2>/dev/null || missing_kw="${missing_kw}MUST "
@@ -689,7 +778,7 @@ if [ -d "$CLAUDE_DIR/rules" ] && [ "$rules_count" -gt 0 ]; then
             rules_no_keywords=$((rules_no_keywords + 1))
             rules_no_kw_list="${rules_no_kw_list} $(basename "$f")[${missing_kw% }]"
         fi
-    done
+    done < <(find "$CLAUDE_DIR/rules" -name "*.md" 2>/dev/null)
 fi
 if [ "$rules_count" -eq 0 ]; then
     add_result "Rules 강제성 키워드" "PASS" "rules 없음 (해당 없음)" 0
@@ -701,17 +790,17 @@ fi
 print_check 19 "${CHECK_NAMES[18]}" "${CHECK_STATUS[18]}" "${CHECK_DETAIL[18]}"
 
 # [20] CLAUDE.md ↔ skills/ 동기화 (CLAUDE.md에 언급된 스킬명이 실제 존재하는지)
+# 하이픈 포함 kebab-case만 스킬 참조 후보로 간주 — `npm`, `git` 같은 일반 용어 오탐 방지 (check 25와 동일 조건)
 claude_skill_missing=0
 claude_skill_list=""
 if [ -f "$ROOT_CLAUDE" ] && [ -d "$CLAUDE_DIR/skills" ]; then
-    # CLAUDE.md에서 backtick으로 감싼 소문자-하이픈 패턴 추출
     while IFS= read -r skill_ref; do
         [ -z "$skill_ref" ] && continue
         if [ ! -d "$CLAUDE_DIR/skills/$skill_ref" ]; then
             claude_skill_missing=$((claude_skill_missing + 1))
             claude_skill_list="${claude_skill_list} ${skill_ref}"
         fi
-    done < <(grep -oE '\`[a-z][a-z0-9-]+\`' "$ROOT_CLAUDE" 2>/dev/null | tr -d '`' | sort -u || true)
+    done < <(grep -oE '\`[a-z][a-z0-9]*-[a-z0-9-]+\`' "$ROOT_CLAUDE" 2>/dev/null | tr -d '`' | sort -u || true)
 fi
 if [ ! -f "$ROOT_CLAUDE" ] || [ ! -d "$CLAUDE_DIR/skills" ]; then
     add_result "CLAUDE.md ↔ Skills 동기화" "PASS" "CLAUDE.md 또는 skills/ 없음 (해당 없음)" 0
@@ -722,48 +811,21 @@ else
 fi
 print_check 20 "${CHECK_NAMES[19]}" "${CHECK_STATUS[19]}" "${CHECK_DETAIL[19]}"
 
-# [21] 자동 학습 시스템 (Memory / Auto-trigger / 승격 시스템)
-
-# ① Memory — 파일/디렉토리에 memory·lessons·learned 패턴 (느슨하게)
-has_memory=false
-_mem_files=$(find "$CLAUDE_DIR" -name "*.md" 2>/dev/null)
-if [ -n "$_mem_files" ]; then
-    echo "$_mem_files" | while IFS= read -r _f; do
-        grep -qiE "Learned Patterns|lessons-learned|^# Memory|^## Memory" "$_f" 2>/dev/null && echo found && break
-    done | grep -q found && has_memory=true || true
-fi
-{ find "$CLAUDE_DIR" -type d 2>/dev/null | grep -qiE "memory|memo"; } && has_memory=true || true
-
-# ② Auto-trigger — hooks/에 .sh 파일 1개 이상
-has_hooks=false
-{ [ -d "$CLAUDE_DIR/hooks" ] && find "$CLAUDE_DIR/hooks" -name "*.sh" 2>/dev/null | grep -q .; } && has_hooks=true || true
-
-# ③ 승격/학습 시스템 — promote·loop·detect·learn 이름의 skill 디렉토리 또는 agent 내용
-has_promotion=false
-{ find "$CLAUDE_DIR/skills" -type d 2>/dev/null | grep -qiE "promote|loop|detect|learn"; } && has_promotion=true || true
-if [ "$has_promotion" = false ] && [ -d "$CLAUDE_DIR/agents" ]; then
-    _agt_files=$(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null)
-    if [ -n "$_agt_files" ]; then
-        echo "$_agt_files" | while IFS= read -r _f; do
-            grep -qiE "promote|learning.loop|자동 학습|auto.learn" "$_f" 2>/dev/null && echo found && break
-        done | grep -q found && has_promotion=true || true
-    fi
-fi
-
-# 점수 집계 — 없어도 패널티 없음(항상 PASS), 있으면 더 좋은 메시지
-learn_score=0
-learn_found=""
-learn_missing=""
-[ "$has_memory"    = true ] && { learn_score=$((learn_score + 1)); learn_found="${learn_found} Memory✓"; }    || learn_missing="${learn_missing} Memory"
-[ "$has_hooks"     = true ] && { learn_score=$((learn_score + 1)); learn_found="${learn_found} Hooks✓"; }     || learn_missing="${learn_missing} Hooks"
-[ "$has_promotion" = true ] && { learn_score=$((learn_score + 1)); learn_found="${learn_found} Promote✓"; }   || learn_missing="${learn_missing} Promote"
-
-if [ "$learn_score" -eq 3 ]; then
-    add_result "자동 학습 시스템" "PASS" "완전 구축됨 —${learn_found} — 반복 패턴 자동 승격으로 장기 토큰 절감 활성화" 0
-elif [ "$learn_score" -ge 1 ]; then
-    add_result "자동 학습 시스템" "PASS" "부분 구축됨 (${learn_score}/3) —${learn_found} / 미감지:${learn_missing}" 0
+# [21] Auto Memory 상태 — MEMORY.md는 세션 시작 시 첫 200줄 또는 25KB만 로드 (공식: memory.md)
+# 저장 위치는 git 저장소 루트에서 파생: ~/.claude/projects/<경로의 /를 -로 치환>/memory/
+mem_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+mem_key=$(printf '%s' "$mem_root" | sed 's|/|-|g')
+mem_file="$HOME/.claude/projects/${mem_key}/memory/MEMORY.md"
+if [ ! -f "$mem_file" ]; then
+    add_result "Auto Memory 상태" "PASS" "auto memory 미감지 (해당 없음)" 0
 else
-    add_result "자동 학습 시스템" "PASS" "미구축 (선택사항) — 구축 시 반복 패턴이 rules로 승격 → 장기 토큰 절감 가능" 0
+    mem_lines=$(count_effective_lines "$mem_file")
+    mem_kb=$(( $(wc -c < "$mem_file" | tr -d ' ') / 1024 ))
+    if [ "$mem_lines" -le 200 ] && [ "$mem_kb" -le 25 ]; then
+        add_result "Auto Memory 상태" "PASS" "MEMORY.md ${mem_lines}줄/${mem_kb}KB — 로드 한계(200줄/25KB) 이내" 0
+    else
+        add_result "Auto Memory 상태" "WARN" "MEMORY.md ${mem_lines}줄/${mem_kb}KB — 한계(200줄/25KB) 초과분은 세션 시작 시 로드되지 않음" 0 "항목당 한 줄로 압축, 상세 내용은 토픽 파일로 이동"
+    fi
 fi
 print_check 21 "${CHECK_NAMES[20]}" "${CHECK_STATUS[20]}" "${CHECK_DETAIL[20]}"
 
@@ -792,9 +854,10 @@ if [ "$agents_count" -eq 0 ]; then
 elif [ "$agent_no_model" -eq 0 ] && [ -z "$agent_reviewer_not_opus" ]; then
     add_result "Agent Model 명시" "PASS" "모든 agent에 model 필드 명시됨 — 비용 최적화 활성화" 0
 elif [ -n "$agent_reviewer_not_opus" ]; then
-    add_result "Agent Model 명시" "WARN" "code-reviewer model이 opus가 아님: ${agent_reviewer_not_opus}" 0 "reviewer는 model: opus 권장 (복잡한 추론), 단순 에이전트는 haiku로 절감"
+    # 공식 규칙 아님 — 참고 수준 제안 (공식 문서의 reviewer 예시가 opus일 뿐)
+    add_result "Agent Model 명시" "PASS" "모든 agent에 model 명시됨 — 참고: reviewer가 opus 아님(${agent_reviewer_not_opus}), 복잡한 리뷰라면 opus 고려" 0
 else
-    add_result "Agent Model 명시" "WARN" "model 미명시 ${agent_no_model}개:${agent_no_model_list}" 0 "reviewer→opus, 단순 작업→haiku 지정 시 비용 절감 가능"
+    add_result "Agent Model 명시" "WARN" "model 미명시 ${agent_no_model}개:${agent_no_model_list} — 기본값 inherit(세션 모델 상속)" 0 "단순 작업 에이전트는 haiku 지정 시 비용 절감 가능"
 fi
 print_check 22 "${CHECK_NAMES[21]}" "${CHECK_STATUS[21]}" "${CHECK_DETAIL[21]}"
 
@@ -839,11 +902,13 @@ fi
 print_check 23 "${CHECK_NAMES[22]}" "${CHECK_STATUS[22]}" "${CHECK_DETAIL[22]}"
 
 # [24] Agent 모델별 비용 분석
-# 모델별 상대 비용: opus=5x, sonnet=1x, haiku=0.2x (기준: sonnet=1)
+# 모델별 상대 비용: opus/fable=5x, sonnet=1x, haiku=0.2x (기준: sonnet=1)
+# 공식 스펙: model 값은 sonnet/opus/haiku/fable/전체 모델 ID(claude-*)/inherit — 기본값 inherit
 agent_model_opus=0
 agent_model_sonnet=0
 agent_model_haiku=0
 agent_model_none=0
+agent_model_other=0
 agent_cost_details=""
 total_weighted_cost=0
 if [ -d "$CLAUDE_DIR/agents" ]; then
@@ -854,11 +919,11 @@ if [ -d "$CLAUDE_DIR/agents" ]; then
         lines=$(count_lines "$f")
         est_tokens=$((lines * TOKENS_PER_LINE))
         case "$model_val" in
-            opus)   agent_model_opus=$((agent_model_opus + 1));     cost=$((est_tokens * 5)); agent_cost_details="${agent_cost_details} ${agent_base}(opus,${est_tokens}tok→${cost}w)" ;;
-            sonnet) agent_model_sonnet=$((agent_model_sonnet + 1)); cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(sonnet,${est_tokens}tok→${cost}w)" ;;
-            haiku)  agent_model_haiku=$((agent_model_haiku + 1));   cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(haiku,${est_tokens}tok→${cost}w)" ;;  # 0.2x → 소수점 회피, 1로 처리
-            "")     agent_model_none=$((agent_model_none + 1));     cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(미지정,${est_tokens}tok→${cost}w)" ;;
-            *)      agent_model_sonnet=$((agent_model_sonnet + 1)); cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(${model_val},${est_tokens}tok→${cost}w)" ;;
+            *opus*|*fable*)  agent_model_opus=$((agent_model_opus + 1));     cost=$((est_tokens * 5)); agent_cost_details="${agent_cost_details} ${agent_base}(${model_val},${est_tokens}tok→${cost}w)" ;;
+            *haiku*)         agent_model_haiku=$((agent_model_haiku + 1));   cost=$((est_tokens / 5)); agent_cost_details="${agent_cost_details} ${agent_base}(${model_val},${est_tokens}tok→${cost}w)" ;;  # 0.2x
+            *sonnet*)        agent_model_sonnet=$((agent_model_sonnet + 1)); cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(${model_val},${est_tokens}tok→${cost}w)" ;;
+            ""|inherit)      agent_model_none=$((agent_model_none + 1));     cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(상속,${est_tokens}tok→${cost}w)" ;;
+            *)               agent_model_other=$((agent_model_other + 1));   cost=$((est_tokens * 1)); agent_cost_details="${agent_cost_details} ${agent_base}(미인식:${model_val},${est_tokens}tok→${cost}w)" ;;
         esac
         total_weighted_cost=$((total_weighted_cost + cost))
     done < <(find "$CLAUDE_DIR/agents" -name "*.md" 2>/dev/null)
@@ -866,12 +931,12 @@ fi
 if [ "$agents_count" -eq 0 ]; then
     add_result "Agent 모델별 비용" "PASS" "agents 없음 (해당 없음)" 0
 elif [ "$agent_model_opus" -eq 0 ]; then
-    add_result "Agent 모델별 비용" "PASS" "opus 에이전트 없음 — 가중 비용: ~${total_weighted_cost}w (opus=${agent_model_opus} sonnet=${agent_model_sonnet} haiku=${agent_model_haiku} 미지정=${agent_model_none})" 0
+    add_result "Agent 모델별 비용" "PASS" "opus급 에이전트 없음 — 가중 비용: ~${total_weighted_cost}w (opus급=${agent_model_opus} sonnet=${agent_model_sonnet} haiku=${agent_model_haiku} 상속/미지정=${agent_model_none} 미인식=${agent_model_other})" 0
 elif [ "$agent_model_opus" -le 2 ]; then
-    add_result "Agent 모델별 비용" "PASS" "opus ${agent_model_opus}개 — 가중 비용: ~${total_weighted_cost}w (opus=${agent_model_opus} sonnet=${agent_model_sonnet} haiku=${agent_model_haiku})" 0
+    add_result "Agent 모델별 비용" "PASS" "opus급(opus/fable) ${agent_model_opus}개 — 가중 비용: ~${total_weighted_cost}w (opus급=${agent_model_opus} sonnet=${agent_model_sonnet} haiku=${agent_model_haiku})" 0
 else
-    save_hint="opus ${agent_model_opus}개 → 단순 에이전트를 sonnet/haiku로 전환 시 비용 절감"
-    add_result "Agent 모델별 비용" "WARN" "opus ${agent_model_opus}개 과다 — 가중 비용: ~${total_weighted_cost}w" 0 "$save_hint"
+    save_hint="opus급 ${agent_model_opus}개 → 단순 에이전트를 sonnet/haiku로 전환 시 비용 절감"
+    add_result "Agent 모델별 비용" "WARN" "opus급(opus/fable) ${agent_model_opus}개 과다 — 가중 비용: ~${total_weighted_cost}w" 0 "$save_hint"
 fi
 print_check 24 "${CHECK_NAMES[23]}" "${CHECK_STATUS[23]}" "${CHECK_DETAIL[23]}"
 
@@ -881,9 +946,9 @@ xref_list=""
 xref_targets=""
 [ -f "$ROOT_CLAUDE" ] && xref_targets="$ROOT_CLAUDE"
 if [ -d "$CLAUDE_DIR/rules" ]; then
-    for f in "$CLAUDE_DIR/rules/"*.md; do
+    while IFS= read -r f; do
         [ -f "$f" ] && xref_targets="${xref_targets} ${f}"
-    done
+    done < <(find "$CLAUDE_DIR/rules" -name "*.md" 2>/dev/null)
 fi
 if [ -n "$xref_targets" ] && [ -d "$CLAUDE_DIR/skills" ]; then
     # 실제 존재하는 skill 이름 목록 수집 (비교용)
@@ -963,25 +1028,33 @@ else
     score_100=0
 fi
 
-# 등급
-if [ "$score_100" -ge 95 ]; then
-    grade="S"
-    grade_color="$CYAN"
-    grade_msg="Perfect — You are a Context Master!"
-elif [ "$score_100" -ge 85 ]; then
+# 등급 — 7단계 (SKILL.md / README / action.yml 공통)
+if [ "$score_100" -ge 90 ]; then
     grade="A"
     grade_color="$GREEN"
     grade_msg="훌륭합니다!"
+elif [ "$score_100" -ge 80 ]; then
+    grade="A-"
+    grade_color="$GREEN"
+    grade_msg="아주 좋습니다"
 elif [ "$score_100" -ge 70 ]; then
-    grade="B"
+    grade="B+"
     grade_color="$GREEN"
     grade_msg="양호합니다"
+elif [ "$score_100" -ge 60 ]; then
+    grade="B"
+    grade_color="$YELLOW"
+    grade_msg="보통입니다"
 elif [ "$score_100" -ge 50 ]; then
     grade="C"
     grade_color="$YELLOW"
     grade_msg="개선이 필요합니다"
-else
+elif [ "$score_100" -ge 40 ]; then
     grade="D"
+    grade_color="$RED"
+    grade_msg="최적화가 시급합니다"
+else
+    grade="F"
     grade_color="$RED"
     grade_msg="즉시 최적화를 권장합니다"
 fi
@@ -997,6 +1070,19 @@ echo -e "  ├────────────────────┼─
 printf "  │ 합계               │ %10d   │ %5d     │\n" "$total_tokens" "$((always_files + ondemand_files))"
 echo -e "  └────────────────────┴──────────────┴───────────┘"
 echo ""
+
+# 서브에이전트 배수 비용 — 스폰마다 CLAUDE.md+rules 전체가 해당 컨텍스트에 재로드됨 (Explore/Plan 제외)
+if [ "$agents_count" -gt 0 ] && [ "$always_tokens" -gt 0 ]; then
+    echo -e "  ${YELLOW}⚠${RESET}  서브에이전트는 스폰마다 상시 로드(~${always_tokens} 토큰)를 자기 컨텍스트에 다시 로드합니다"
+    echo -e "     ${DIM}→ 상시 로드 절감 효과는 에이전트 사용량에 비례해 커집니다${RESET}"
+    echo ""
+fi
+
+# legacy commands 안내
+if [ "$commands_count" -gt 0 ]; then
+    echo -e "  ${DIM}ℹ legacy .claude/commands/ ${commands_count}개 — 계속 동작하지만 skills/ 마이그레이션 권장 (supporting files·자동 로드 지원)${RESET}"
+    echo ""
+fi
 
 # 개선 필요 항목 (FAIL/WARN만 표시)
 has_issues=false
@@ -1074,57 +1160,16 @@ if [ "$score_100" -lt 85 ]; then
         fi
     fi
 
-    echo -e "${CYAN}${BOLD}━━━ Phase 3: 최적화 ━━━${RESET}\n"
-    echo -e "  평가 결과를 바탕으로 자동 최적화를 실행합니다."
-    echo -e "  ${DIM}(압축, 중복 제거, 재구조화 — 완료 후 자동 삭제)${RESET}"
+    echo -e "${CYAN}${BOLD}━━━ Phase 3: 최적화 안내 ━━━${RESET}\n"
+    echo -e "  이 스크립트는 평가만 수행합니다 — 프로젝트 파일을 변경하지 않습니다."
+    echo -e "  최적화는 Claude Code 안에서 실행하세요 (모든 변경은 적용 전 확인을 거칩니다):"
     echo ""
-    printf "  지금 최적화하시겠습니까? (y/n): "
-    read -r REPLY
+    echo -e "  ${BOLD}플러그인 설치 (권장):${RESET}"
+    echo -e "    claude plugin marketplace add warrenth/ctxcraft"
+    echo -e "    claude plugin install ctxcraft@tools"
+    echo -e "    → Claude Code에서 ${BOLD}/ctxcraft:optimize${RESET} (미리보기: ${BOLD}--dry${RESET})"
     echo ""
-
-    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-        # 1. 스킬 설치
-        start_spinner "ctxcraft 최적화 도구 설치 중..."
-        TEMP_DIR=$(mktemp -d)
-        git clone --quiet --depth 1 "$REPO_URL" "$TEMP_DIR/ctxcraft"
-
-        mkdir -p "$CLAUDE_DIR/skills"
-        for skill_dir in "$TEMP_DIR/ctxcraft/skills/"*; do
-            [ -d "$skill_dir" ] || continue
-            skill_name=$(basename "$skill_dir")
-            cp -r "$skill_dir" "$CLAUDE_DIR/skills/$skill_name"
-        done
-
-        mkdir -p "$CLAUDE_DIR/agents"
-        for agent_file in "$TEMP_DIR/ctxcraft/agents/"*; do
-            [ -f "$agent_file" ] || continue
-            cp "$agent_file" "$CLAUDE_DIR/agents/"
-        done
-
-        rm -rf "$TEMP_DIR"
-        stop_spinner "설치 완료"
-        echo ""
-
-        # 2. claude CLI로 /optimize 자동 실행
-        if command -v claude &>/dev/null; then
-            echo -e "  ${GREEN}✓${RESET} Claude Code 감지 — 최적화를 시작합니다."
-            echo -e "  ${DIM}완료 후 ctxcraft 파일은 자동으로 삭제됩니다.${RESET}"
-            echo ""
-            NORMAL_EXIT=true
-            claude "/optimize"
-        else
-            echo -e "  ${YELLOW}⚠${RESET}  claude CLI를 찾을 수 없습니다."
-            echo -e "  Claude Code에서 직접 실행하세요:"
-            echo ""
-            echo -e "    ${BOLD}/optimize${RESET}        — 자동 최적화"
-            echo -e "    ${BOLD}/optimize --dry${RESET}  — 미리보기만"
-            echo ""
-            echo -e "  ${DIM}최적화 완료 후 ctxcraft 파일은 자동으로 삭제됩니다.${RESET}"
-        fi
-    else
-        echo -e "  ${DIM}건너뛰었습니다.${RESET}"
-        echo -e "  나중에 다시: ${DIM}curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/evaluate.sh | bash${RESET}"
-    fi
+    echo -e "  ${DIM}전역 설치 대안: curl -sL https://raw.githubusercontent.com/warrenth/ctxcraft/main/install.sh | bash → /optimize${RESET}"
 elif [ "$score_100" -ge 95 ]; then
     echo -e "  ${CYAN}${BOLD}🏆 Perfect — You are a Context Master!${RESET}"
     echo -e "  ${DIM}당신의 .claude/ 구조는 토큰 효율의 정점입니다.${RESET}"

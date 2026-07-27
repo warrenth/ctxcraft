@@ -1,9 +1,8 @@
 ---
 name: optimize
 description: Apply token optimization improvements based on evaluation results
-user_invocable: true
-command: /optimize
-tools: [Read, Write, Edit, Grep, Glob, Agent]
+disable-model-invocation: true
+allowed-tools: Read, Write, Edit, Grep, Glob
 ---
 
 # Token Optimization
@@ -41,7 +40,7 @@ CLAUDE.md is loaded EVERY conversation. Every line costs tokens.
 - Remove section headers that add no information
 - Merge related short sections
 
-**Target:** Under 150 lines for CLAUDE.md
+**Target:** Under 200 lines for CLAUDE.md (official: "target under 200 lines" — code.claude.com/docs/en/memory.md; aim lower when possible)
 
 **Before:**
 ```markdown
@@ -98,6 +97,17 @@ Move always-loaded content to on-demand skills:
 
 **Action:** Extract verbose sections from rules/ into new skills, leave a one-line reference.
 
+**Alternative — path-scope instead of moving:** If a rule only matters for specific file types or directories, keep it in rules/ but add `paths:` frontmatter (official feature). The rule then loads only when Claude reads matching files — same token savings, no restructuring:
+
+```markdown
+---
+paths:
+  - "src/api/**/*.ts"
+---
+# API Development Rules
+...
+```
+
 **Dedup Check:** Before adding content to a skill, check for duplicates:
 1. Extract key identifiers (function names, pattern names, class names) from the rules/ code block being moved
 2. Grep the target SKILL.md for those identifiers
@@ -135,7 +145,7 @@ Merge granular rules files that cover related topics:
 
 ### Strategy 6: Extract Skills References
 
-When a SKILL.md exceeds 150 lines, split verbose content into a `references/` subdirectory:
+When a SKILL.md exceeds 150 lines (official hard cap: "Keep SKILL.md under 500 lines"), split verbose content into a `references/` subdirectory — this matches the Agent Skills open standard layout (`scripts/`, `references/`, `assets/` — agentskills.io):
 
 **What to extract:**
 - Long code examples and templates
@@ -152,6 +162,16 @@ When a SKILL.md exceeds 150 lines, split verbose content into a `references/` su
 1. Identify which sections were newly added by Strategy 4
 2. Extract those sections (plus any other verbose content) into `references/`
 3. Report the chain action in the optimization plan output
+
+### Strategy 7: Environment-Level Savings
+
+Optimizations outside `.claude/` markdown files (always confirm before touching settings):
+
+- **Monorepo**: irrelevant ancestor CLAUDE.md files → add `claudeMdExcludes` globs to `.claude/settings.local.json`
+- **AGENTS.md duplication**: if the repo has both `AGENTS.md` and `CLAUDE.md` with overlapping content → replace the overlap with a single `@AGENTS.md` import (or symlink) — official pattern
+- **Sensitive/heavy files**: block reads via `permissions.deny` (`"Read(./secrets/**)"`) — note: `.claudeignore` is NOT an official feature
+- **Human-only notes**: wrap in block HTML comments `<!-- ... -->` — stripped before injection, 0 tokens
+- **Legacy commands**: `.claude/commands/*.md` still work but skills support supporting files and auto-invocation → migrate to `skills/<name>/SKILL.md`
 
 ## Execution Flow
 
@@ -170,9 +190,10 @@ When a SKILL.md exceeds 150 lines, split verbose content into a `references/` su
    - Count lines of each skill modified in step 6
    - If >150 lines → auto-run Strategy 6 (extract to references/)
 8. Apply Strategy 5 (Rule Consolidation)
-9. Re-run /evaluate to get after state
-10. Show before/after comparison report
-11. Clean up scratch files (ctxcraft-report.md, ctxcraft-backup/)
+9. Offer Strategy 7 (environment-level) — settings.json changes require explicit confirmation
+10. Re-run /evaluate to get after state
+11. Show before/after comparison report
+12. Clean up scratch files (ctxcraft-report.md, ctxcraft-backup/)
 ```
 
 ## Output Format

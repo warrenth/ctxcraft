@@ -16,7 +16,7 @@ outputs:
     description: '토큰 효율 점수 (0-100)'
     value: ${{ steps.evaluate.outputs.score }}
   grade:
-    description: '등급 (A/B/C/D)'
+    description: '등급 (A/A-/B+/B/C/D/F)'
     value: ${{ steps.evaluate.outputs.grade }}
 
 runs:
@@ -35,7 +35,7 @@ runs:
 
         # 점수/등급 추출
         SCORE=$(grep -oE '[0-9]+/100' /tmp/ctxcraft-output.txt | tail -1 | cut -d'/' -f1 || echo "0")
-        GRADE=$(grep -oE '\([A-D]\)' /tmp/ctxcraft-output.txt | tail -1 | tr -d '()' || echo "D")
+        GRADE=$(grep -oE '\([A-F][+-]?\)' /tmp/ctxcraft-output.txt | tail -1 | tr -d '()' || echo "F")
 
         echo "score=$SCORE" >> $GITHUB_OUTPUT
         echo "grade=$GRADE" >> $GITHUB_OUTPUT
@@ -54,11 +54,12 @@ runs:
         EXIT_CODE="${{ steps.evaluate.outputs.exit_code }}"
 
         case "$GRADE" in
-          A) BADGE="🟢" ; STATUS="훌륭합니다!" ;;
-          B) BADGE="🟡" ; STATUS="양호합니다" ;;
-          C) BADGE="🟠" ; STATUS="개선이 필요합니다" ;;
-          D) BADGE="🔴" ; STATUS="즉시 최적화를 권장합니다" ;;
-          *) BADGE="⚪" ; STATUS="" ;;
+          A)    BADGE="🟢" ; STATUS="훌륭합니다!" ;;
+          A-)   BADGE="🟢" ; STATUS="아주 좋습니다" ;;
+          B+|B) BADGE="🟡" ; STATUS="양호합니다" ;;
+          C)    BADGE="🟠" ; STATUS="개선이 필요합니다" ;;
+          D|F)  BADGE="🔴" ; STATUS="즉시 최적화를 권장합니다" ;;
+          *)    BADGE="⚪" ; STATUS="" ;;
         esac
 
         THRESHOLD="${{ inputs.threshold }}"

@@ -1,9 +1,7 @@
 ---
 name: evaluate
 description: Evaluate .claude/ directory token efficiency and generate a score report
-user_invocable: true
-command: /evaluate
-tools: [Read, Grep, Glob, Agent]
+allowed-tools: Read, Grep, Glob
 ---
 
 # Token Efficiency Evaluation
@@ -40,33 +38,41 @@ Scan the project's `.claude/` directory:
 
 ```
 .claude/
-├── CLAUDE.md (project root)
-├── rules/          ← always loaded every conversation
-├── skills/         ← loaded on-demand
-├── agents/         ← loaded on-demand (isolated context)
+├── CLAUDE.md                        ← always loaded (+ @imports, max depth 4)
+├── rules/**/*.md  without paths:   ← always loaded (recursive, subdirs OK)
+├── rules/**/*.md  with paths:      ← on-demand (loads only when matching files are read)
+├── skills/         ← descriptions always loaded; bodies on-demand
+│                     (exception: disable-model-invocation skills load NO description)
+├── agents/         ← descriptions always loaded; body on spawn
+│                     (note: a spawned subagent reloads the full CLAUDE.md hierarchy + rules)
+├── commands/       ← legacy custom commands (merged into skills; still work, on-demand)
 ├── hooks/          ← shell scripts, not loaded as context
 ├── scratch/        ← temporary, not loaded
 └── other .md files
 ```
 
-Also check the project root for `CLAUDE.md` — this is always loaded.
+Also check auto memory at `~/.claude/projects/<project-path-with-dashes>/memory/MEMORY.md` — only the first 200 lines or 25KB load at session start.
+
+Also check the project root for `CLAUDE.md` — this is always loaded, and follow its `@path` imports (they load at launch too; imports inside backticks or code fences don't count).
 
 ### Step 2: Measure Token Usage
 
 For each file, estimate tokens:
 - **Rule of thumb**: 1 line ≈ 10-15 tokens (avg for markdown with code)
 - Count total lines per file using the Read tool (do NOT use Bash `wc -l`)
+- **Exclude block-level HTML comments** (`<!-- ... -->`) — they are stripped before injection and cost 0 tokens
 - Categorize as:
-  - **Always-loaded**: `CLAUDE.md` (root + .claude/), `rules/*.md` — loaded EVERY conversation
-  - **On-demand**: `skills/`, `agents/` — loaded only when triggered
+  - **Always-loaded**: `CLAUDE.md` (root + .claude/) plus its `@path` import chain (max depth 4), `rules/` files WITHOUT `paths:` frontmatter, skill descriptions (except `disable-model-invocation: true` skills)
+  - **On-demand**: `rules/` files WITH `paths:` frontmatter, skill bodies, agent bodies
   - **Inactive**: `hooks/`, `scratch/`, config files — not counted as context tokens
+- Remember: every spawned subagent reloads the full CLAUDE.md hierarchy + always-on rules in its own context, so always-on weight is multiplied by subagent usage
 
 ### Step 3: Detect Issues — Quality
 
 Quality issues affect **adherence** regardless of plan tier.
 
 #### 🔴 Critical
-- `CLAUDE.md` exceeds 200 lines (official recommendation — longer files degrade rule adherence)
+- `CLAUDE.md` exceeds 200 lines (official: "target under 200 lines per CLAUDE.md file" — https://code.claude.com/docs/en/memory.md)
 - Duplicate paragraphs or sections across files (risk of contradiction)
 - Broken cross-references: `/skill-name` in rules/CLAUDE.md pointing to non-existent skills/
 
@@ -78,7 +84,7 @@ Quality issues affect **adherence** regardless of plan tier.
 
 #### 🟢 Info
 - Content in `rules/` that could be a skill (only needed for specific tasks)
-- Skills with very large SKILL.md files (>250 lines without references/ split)
+- Skills with very large SKILL.md files (>150 lines without references/ split; official cap is 500)
 - Rules that are too granular (could be merged)
 - Skills that haven't been referenced recently (check learning-log if available)
 
@@ -98,7 +104,7 @@ Run ALL 25 checks below. Each check results in PASS (0), WARN (-1), or FAIL (-3)
 | 4 | Rules file count | ≤ 15 | 16–20 | > 20 |
 | 5 | Duplicate sections (CLAUDE.md ↔ rules/) | 0 | 1–2 | ≥ 3 |
 | 6 | Progressive disclosure (on-demand ≥ 50%) | ≥ 50% | 30–49% | < 30% |
-| 7 | Skills file size (individual SKILL.md) | all ≤ 150 lines | any 151–250 | any > 250 |
+| 7 | Skills file size (official cap 500 lines; ctxcraft strict 150) | all ≤ 150 lines | any 151–500 | any > 500 |
 | 8 | Token allocation (always-on ≤ 30% of total) | ≤ 30% | 31–50% | > 50% |
 
 **Structural Validity (9–25)**
@@ -106,26 +112,29 @@ Run ALL 25 checks below. Each check results in PASS (0), WARN (-1), or FAIL (-3)
 | # | Check | PASS | WARN | FAIL |
 |---|-------|------|------|------|
 | 9 | Agent frontmatter (valid YAML `---` block) | all valid | — | any invalid |
-| 10 | Agent required fields (name/description/tools) | all present | — | any missing |
+| 10 | Agent required fields (name/description — tools is optional per spec) | all present | any missing | — |
 | 11 | Skill frontmatter (valid YAML `---` block) | all valid | — | any invalid |
 | 12 | Skill references links (files exist) | all exist | — | any missing |
 | 13 | Rules skill references (`> See also` / `> 심화` pattern) | all rules have ref | most have | < 50% have |
-| 14 | Rules pure Markdown (no YAML frontmatter) | none have frontmatter | — | any have |
+| 14 | Rules conditional loading (`paths:` frontmatter — official lazy-load) | scoped rules used, or always-on rules small | large always-on rules, none scoped | — |
 | 15 | Skills orphan directories (SKILL.md exists) | none orphaned | — | any orphaned |
-| 16 | Rules flat structure (no subdirectories) | flat | — | has subdirs |
+| 16 | Skill description length (description + when_to_use ≤ 1,536 chars — excess is truncated in listing) | all within | any over | — |
 | 17 | Agent skills references valid | all valid | — | any invalid |
 | 18 | Agent least privilege (read-only agents) | correct | — | Write/Edit on reviewer/auditor |
 | 19 | Rules enforcement keywords (MUST/SHOULD/NEVER) | present | — | missing |
 | 20 | CLAUDE.md ↔ Skills sync | all referenced skills exist | — | any missing |
-| 21 | Auto-learning system (hooks + promotion) | present | partial | missing |
+| 21 | Auto memory (MEMORY.md within 200-line/25KB load limit) | within limit or absent | over limit | — |
 | 22 | Agent model specified | all specified | — | any missing |
 | 23 | Context saving (scratch dir + save rules) | present | partial | missing |
 | 24 | Agent model cost (opus ≤ 2) | ≤ 2 opus | 3 opus | > 3 opus |
 | 25 | Cross-reference validity | all valid | — | any broken |
 
-**Score calculation:**
+**Score calculation** (same formula as evaluate.sh):
 ```
-Quality Score = 100 - (FAIL_count × 3) - (WARN_count × 1)
+Each scored check earns: PASS = 10, WARN = 5, FAIL = 0
+Checks marked "N/A" (해당 없음) are EXCLUDED from scoring — no free points
+
+Quality Score = (earned points / (scored_checks × 10)) × 100
 
 Grades: A (90–100), A- (80–89), B+ (70–79), B (60–69), C (50–59), D (40–49), F (0–39)
 ```
@@ -148,9 +157,15 @@ Cost impact is **informational**, not scored. Show how much of the plan's contex
 
 #### Agent Model Cost (informational)
 
-- opus=5x, sonnet=1x, haiku=0.2x (base: sonnet)
+- opus/fable=5x, sonnet=1x, haiku=0.2x (base: sonnet); `inherit` (default) follows the session model
 - Show weighted cost breakdown per agent
-- More than 2 opus agents → suggest reviewing if all need opus
+- More than 2 opus-tier agents → suggest reviewing if all need opus
+
+#### Subagent Multiplier (informational)
+
+Every spawned subagent reloads the FULL CLAUDE.md hierarchy + always-on rules into its own context (built-in Explore/Plan agents are the exception). Report this as:
+- `Subagent respawn cost: ~{always_tokens} tokens per spawn`
+- Heavy always-on config × frequent subagent use = multiplied waste — this is the strongest quantitative argument for trimming always-on files
 
 #### Detect Plan Tier
 
@@ -214,6 +229,15 @@ Output a clean, readable report with **two separate sections**:
 ### Step 7: Save Report
 
 Save the full report to `.claude/scratch/ctxcraft-report.md` for reference.
+
+Also save the machine-readable before-state to `.claude/scratch/ctxcraft-before.json` so `/optimize` can show a before/after comparison:
+
+```json
+{
+  "score": 0, "grade": "", "always_tokens": 0, "ondemand_tokens": 0,
+  "total_tokens": 0, "pass": 0, "warn": 0, "fail": 0, "saveable_tokens": 0
+}
+```
 
 ## Important Rules
 

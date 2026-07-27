@@ -17,8 +17,11 @@ When spawned, performs the analysis tasks below and returns a structured report.
 
 ### 1. Collect File Inventory
 - Glob all `.md` files under `.claude/` and the project root `CLAUDE.md`
-- Measure line count per file (using Read tool)
+- Measure line count per file (using Read tool); exclude block-level HTML comments (stripped before injection)
 - Classify: always-on vs on-demand vs inactive
+  - rules with `paths:` frontmatter → on-demand (official lazy-load); rules without → always-on
+  - CLAUDE.md `@path` imports → always-on (loaded at launch, max depth 4)
+  - skill descriptions → always-on, except `disable-model-invocation: true` skills (no description loaded)
 
 ### 2. Detect Duplicates
 - Grep for repeated headings (identical `##` titles) across rules/ files
@@ -33,10 +36,10 @@ When spawned, performs the analysis tasks below and returns a structured report.
 
 ### 4. Size Analysis
 - Flag files exceeding thresholds:
-  - CLAUDE.md > 200 lines
-  - rules/*.md > 80 lines
-  - skills/*/SKILL.md > 150 lines
-  - agents/*.md > 120 lines
+  - CLAUDE.md > 200 lines (official: "target under 200 lines")
+  - rules/*.md > 150 lines
+  - skills/*/SKILL.md > 150 lines (official hard cap: 500)
+  - agents/*.md > 150 lines
 
 ### 5. Agent Model Cost Analysis
 - Read `model:` field from each agent frontmatter
@@ -51,33 +54,36 @@ When spawned, performs the analysis tasks below and returns a structured report.
 
 ## Output Format
 
+Write the report in the language the caller detected (the `/evaluate` skill's Step 0 locale detection); default to English. Template structure:
+
 ```
-## 감사 결과
+## Audit Results
 
-### 파일 목록
-| 파일 | 줄 수 | 분류 | 추정 토큰 |
-|------|-------|------|----------|
-| ... | ... | 상시/온디맨드 | ... |
+### File Inventory
+| File | Lines | Category | Est. Tokens |
+|------|-------|----------|-------------|
+| ... | ... | always-on / on-demand | ... |
 
-### 합계: 상시 로드 X 토큰, 온디맨드 Y 토큰
+### Totals: always-on X tokens, on-demand Y tokens
+(also report: subagent respawn cost ≈ always-on tokens per spawn)
 
-### 발견된 중복
-1. [파일A] ↔ [파일B]: ~N줄 겹침 — [설명]
+### Duplicates Found
+1. [fileA] ↔ [fileB]: ~N overlapping lines — [description]
 
-### 미사용 파일
-1. [파일] — N세션 동안 참조 0회
+### Unused Files
+1. [file] — 0 references across N sessions
 
-### 과대 파일
-1. [파일] — N줄 (기준치: M줄)
+### Oversized Files
+1. [file] — N lines (threshold: M lines)
 
-### Agent 모델별 비용
-| Agent | Model | 토큰 | 가중 비용 |
-|-------|-------|------|----------|
-| ... | opus/sonnet/haiku | ... | ...w |
-| **합계** | | | **Xw** |
+### Agent Model Cost
+| Agent | Model | Tokens | Weighted Cost |
+|-------|-------|--------|---------------|
+| ... | opus/sonnet/haiku/inherit | ... | ...w |
+| **Total** | | | **Xw** |
 
-### 깨진 참조 (Cross-reference)
-1. [소스파일] → /skill-name — skills/skill-name/ 없음
+### Broken Cross-references
+1. [source file] → /skill-name — skills/skill-name/ missing
 ```
 
 ## Rules

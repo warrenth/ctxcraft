@@ -1,37 +1,46 @@
 ---
 name: token-guide
 description: Reference guide for token-efficient .claude/ directory design patterns
-user_invocable: false
-tools: [Read]
+user-invocable: false
 ---
 
 # Token Efficiency Guide
 
 ## How Claude Code Loads Context
 
-```
-Every conversation starts by loading:
-1. CLAUDE.md (project root)           ← ALWAYS loaded
-2. CLAUDE.md (.claude/ directory)      ← ALWAYS loaded
-3. rules/*.md                          ← ALWAYS loaded
-4. Skill/agent descriptions (names)    ← ALWAYS loaded (just the index)
+> Source: code.claude.com/docs/en/memory.md, skills.md, sub-agents.md
 
-Loaded on-demand (only when triggered):
-5. skills/*/SKILL.md                   ← when /command is invoked
-6. agents/*.md                         ← when Agent tool selects it
-7. Memory files                        ← when relevant context detected
+```
+Loaded at session start (always-on):
+1. CLAUDE.md — root, .claude/, ~/.claude/ — plus @path imports (max depth 4;
+   imports load at launch, so splitting does NOT save tokens)
+2. rules/**/*.md WITHOUT paths: frontmatter (recursive; subdirs and symlinks OK)
+3. Skill descriptions (+ when_to_use, truncated at 1,536 chars)
+   — except disable-model-invocation skills, which load NO description
+4. Auto memory MEMORY.md — first 200 lines or 25KB, whichever comes first
+
+Loaded on-demand:
+5. rules/**/*.md WITH paths: frontmatter  ← when Claude reads matching files
+6. skills/*/SKILL.md body                 ← when invoked (then stays in context)
+7. agents/*.md body                       ← when the subagent is spawned
+   ⚠ a spawned subagent also reloads the FULL CLAUDE.md hierarchy + rules
+8. Memory topic files, nested CLAUDE.md / nested skills in subdirectories
+
+Not context: hooks/ scripts, scratch/, settings files.
+Block-level HTML comments (<!-- -->) are stripped before injection — free for humans.
 ```
 
 ## Cost Model
 
 | Category | When Loaded | Cost per Conversation |
 |----------|-------------|----------------------|
-| CLAUDE.md | Always | Every single conversation |
-| rules/*.md | Always | Every single conversation |
-| Skill index | Always | Minimal (name + description only) |
-| SKILL.md body | On trigger | Only when /command runs |
-| Agent .md body | On delegation | Only when agent is spawned |
-| Memory files | On relevance | Only when memory system activates |
+| CLAUDE.md + @imports | Always | Every single conversation |
+| rules without `paths:` | Always | Every single conversation |
+| rules with `paths:` | On file match | Only when matching files are read |
+| Skill index (desc + when_to_use) | Always | ≤1,536 chars each; 0 for disable-model-invocation skills |
+| SKILL.md body | On invoke | Loads once, then persists in context (official tip: keep under 500 lines) |
+| Agent .md body | On spawn | Body + full CLAUDE.md/rules reload per spawn |
+| Auto memory MEMORY.md | Always | First 200 lines / 25KB only |
 
 ## Token Estimation
 
@@ -42,12 +51,16 @@ Loaded on-demand (only when triggered):
 
 ### Budget Guidelines
 
+Aligned with the `/evaluate` thresholds (WARN 8,000 / CRITICAL 12,000):
+
 | Always-loaded | Rating |
 |---------------|--------|
-| < 2,000 tokens | Excellent |
-| 2,000 - 4,000 | Good |
-| 4,000 - 6,000 | Needs optimization |
-| > 6,000 | Critical — actively wasting tokens |
+| < 4,000 tokens | Excellent |
+| 4,000 - 8,000 | Good |
+| 8,001 - 12,000 | Needs optimization (WARN) |
+| > 12,000 | Critical — actively wasting tokens (FAIL) |
+
+Remember: always-on tokens are also reloaded into every spawned subagent's context, so real waste scales with subagent usage.
 
 ## Design Patterns
 
